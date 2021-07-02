@@ -39,4 +39,14 @@ private:
     GLuint id_ = 0;
 };
 
+inline
+auto fragment_shader() {
+    return Shader(GL_FRAGMENT_SHADER);
+}
+
+inline
+auto vertex_shader() {
+    return Shader(GL_VERTEX_SHADER);
+}
+
 }

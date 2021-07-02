@@ -1,6 +1,8 @@
+#include "gl/all.hpp"
+
 #include "matrix/all.hpp"
-#include "shader/all.hpp"
 #include "vector/all.hpp"
+
 #include "file.hpp"
 #include "pi.hpp"
 #include "root.hpp"
@@ -9,48 +11,17 @@
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
- 
-#include "linmath.h"
- 
-#include <stdlib.h>
-#include <stdio.h>
 
+#include <array>
 #include <fstream>
 #include <iostream>
  
 using namespace tlw;
 
-struct Vertex {
-    float x, y;
-    float r, g, b;
-};
-
-const Vertex vertices[6] =
-{
-    { -1.f, -1.f, 1.f, 0.f, 0.f },
-    { -1.f,  1.f, 0.f, 1.f, 0.f },
-    {  1.f, -1.f, 0.f, 0.f, 1.f },
-    { -1.f,  1.f, 1.f, 1.f, 0.f },
-    {  1.f, -1.f, 1.f, 0.f, 1.f },
-    {  1.f,  1.f, 0.f, 1.f, 1.f }
-};
-
-const std::string vertex_shader_text =
-"#version 110\n"
-"uniform mat4 MVP;\n"
-"attribute vec3 vCol;\n"
-"attribute vec2 vPos;\n"
-"varying vec3 color;\n"
-"void main()\n"
-"{\n"
-"    gl_Position = vec4(vPos, 0.0, 1.0);\n"
-"    color = vCol;\n"
-"}\n";
- 
 static void error_callback(int error, const char* description)
 {
     (void) error;
-    fprintf(stderr, "Error: %s\n", description);
+    std::cerr << "Error: " << description << std::endl;
 }
  
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -61,129 +32,186 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
-const std::string fragment_shader_filepath = root + "src/shader.glsl";
-
 int throwing_main(void) {
-    const std::string fragment_shader_text = file(fragment_shader_filepath);
-
     GLFWwindow* window;
-    GLuint vertex_buffer, program;
-    GLint mvp_location, vpos_location, vcol_location;
- 
-    glfwSetErrorCallback(error_callback);
- 
-    if (!glfwInit())
-        exit(EXIT_FAILURE);
- 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
- 
-    window = glfwCreateWindow(1280, 720, "First stream yay !", NULL, NULL);
-    if (!window)
     {
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
+        glfwSetErrorCallback(error_callback);
  
-    glfwSetKeyCallback(window, key_callback);
- 
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
+        if (!glfwInit())
+            exit(EXIT_FAILURE);
+    
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    
+        window = glfwCreateWindow(1280, 720, "Cube.", NULL, NULL);
+        if (!window)
+        {
+            glfwTerminate();
+            exit(EXIT_FAILURE);
+        }
+    
+        glfwSetKeyCallback(window, key_callback);
+    
+        glfwMakeContextCurrent(window);
+        glfwSwapInterval(1);
 
-    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
-        printf("Failed to initialize OpenGL context");
-        return -1;
+        if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
+            printf("Failed to initialize OpenGL context");
+            return -1;
+        }
     }
-  
-    glGenBuffers(1, &vertex_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
- 
-    auto vertex_shader = Shader(GL_VERTEX_SHADER);
+
+    const auto vertex_colors = std::array{
+        Vec3{0.f, 0.f, 0.f},
+        Vec3{0.f, 0.f, 1.f},
+        Vec3{0.f, 1.f, 0.f},
+        Vec3{0.f, 1.f, 1.f},
+        Vec3{1.f, 0.f, 0.f},
+        Vec3{1.f, 0.f, 1.f},
+        Vec3{1.f, 1.f, 0.f},
+        Vec3{1.f, 1.f, 1.f}
+    };
+
+    auto vertex_positions = std::array{
+        Vec3{-0.5f, -0.5f, -0.5f},
+        Vec3{-0.5f, -0.5f,  0.5f},
+        Vec3{-0.5f,  0.5f, -0.5f},
+        Vec3{-0.5f,  0.5f,  0.5f},
+        Vec3{ 0.5f, -0.5f, -0.5f},
+        Vec3{ 0.5f, -0.5f,  0.5f},
+        Vec3{ 0.5f,  0.5f, -0.5f},
+        Vec3{ 0.5f,  0.5f,  0.5f}
+    };
+
+    const auto triangle_indices = std::array{
+        0u, 3u, 1u, 0u, 2u, 3u, // -x face
+        4u, 7u, 5u, 4u, 6u, 7u, // +x face
+        0u, 1u, 5u, 0u, 5u, 4u, // -y face
+        2u, 7u, 3u, 2u, 6u, 7u, // +y face
+        0u, 6u, 2u, 0u, 4u, 6u, // -z face
+        1u, 3u, 7u, 1u, 7u, 5u  // +z face
+    };
+
+    auto va = gl::VertexArray();
+    gl::bind(va);
+
+    auto colors_buffer = gl::Buffer();
     {
-        source(vertex_shader, vertex_shader_text);
-        auto warnings = compile(vertex_shader);
-        std::cout << warnings << std::endl;
+        gl::bind_to_array(colors_buffer);
+        gl::storage(colors_buffer, std::span(vertex_colors));
+
+        gl::enable(va, 1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 12, 0);
     }
- 
-    auto fragment_shader = Shader(GL_FRAGMENT_SHADER);
+
+    auto positions_buffer = gl::Buffer();
     {
-        source(fragment_shader, fragment_shader_text);
-        auto warnings = compile(fragment_shader);
-        std::cout << warnings << std::endl;
+        gl::bind_to_array(positions_buffer);
+        gl::storage(positions_buffer, std::span(vertex_positions));
+
+        gl::enable(va, 0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, 0);
+    }
+
+    auto element_array_buffer = gl::Buffer();
+    {
+        gl::bind_to_element_array(element_array_buffer);
+        gl::storage(element_array_buffer, std::span(triangle_indices));
+    }
+
+    auto program = gl::Program();
+    {
+        auto vs = vertex_shader();
+        {
+            source(vs, file(root + "data/shader/pass_through.vs"));
+            auto success = gl::try_compile(vs);
+            if(success) {
+                std::cout << "-- Vertex shader compilation succeeded." << std::endl;
+            } else {
+                std::cerr << info_log(vs) << std::endl;
+                throw gl::CompilationFailure();
+            }
+        }
+
+        auto fs = fragment_shader();
+        {
+            source(fs, file(root + "data/shader/pass_through.fs"));
+            auto success = gl::try_compile(fs);
+            if(success) {
+                std::cout << "-- Fragment shader compilation succeeded." << std::endl;
+            } else {
+                std::cerr << info_log(fs) << std::endl;
+                throw gl::CompilationFailure();
+            }
+        }
+
+        gl::attach(program, vs);
+        gl::attach(program, fs);
+        {
+            auto success = gl::try_link(program);
+            if(success) {
+                std::cout << "-- Program linkage succeeded." << std::endl;
+            } else {
+                std::cerr << gl::info_log(program) << std::endl;
+                throw gl::LinkageFailure();
+            }
+        }
+        gl::use(program);
     }
     
-    program = glCreateProgram();
-    glAttachShader(program, vertex_shader);
-    glAttachShader(program, fragment_shader);
-    glLinkProgram(program);
- 
-    mvp_location = glGetUniformLocation(program, "MVP");
-    vpos_location = glGetAttribLocation(program, "vPos");
-    vcol_location = glGetAttribLocation(program, "vCol");
- 
-    glEnableVertexAttribArray(vpos_location);
-    glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(vertices[0]), (void*) 0);
-    glEnableVertexAttribArray(vcol_location);
-    glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(vertices[0]), (void*) (sizeof(float) * 2));
- 
-    float angle_y = 0.f;
-    auto camera_position = tlw::vec3(0.f, 1.5f, -5.f);
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
 
-    while (!glfwWindowShouldClose(window)) {
+    auto camera_position = Vec3{0.f, 0.f, 0.f};
+    auto camera_y_angle = 0.f;
+
+    auto object_x_angle = 0.f;
+    auto object_y_angle = 0.f;
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    while(!glfwWindowShouldClose(window)) {
         if(glfwGetKey(window, GLFW_KEY_A)) {
-            angle_y += 0.02f;
+            camera_y_angle -= 0.02f;
         }
         if(glfwGetKey(window, GLFW_KEY_D)) {
-            angle_y -= 0.02f;
+            camera_y_angle += 0.02f;
+        }
+        if(glfwGetKey(window, GLFW_KEY_DOWN)) {
+            object_x_angle -= 0.02f;
+        }
+        if(glfwGetKey(window, GLFW_KEY_LEFT)) {
+            object_y_angle -= 0.02f;
+        }
+        if(glfwGetKey(window, GLFW_KEY_RIGHT)) {
+            object_y_angle += 0.02f;
         }
         if(glfwGetKey(window, GLFW_KEY_S)) {
-            camera_position = camera_position
-            + xyz(rotation_y(angle_y)
-            * tlw::vec4(0.f, 0.f, -0.2f, 1.f));
+            camera_position = camera_position + Vec3{0.f, 0.f, -0.01f};
         }
-        if(glfwGetKey(window, GLFW_KEY_R)) {
-            auto src = file(fragment_shader_filepath);
-            source(fragment_shader, src);
-            auto warnings = compile(fragment_shader);
-            std::cout << warnings << std::endl;
-            glLinkProgram(program);
+        if(glfwGetKey(window, GLFW_KEY_UP)) {
+            object_x_angle += 0.02f;
         }
         if(glfwGetKey(window, GLFW_KEY_W)) {
-            camera_position = camera_position
-            + xyz(rotation_y(angle_y)
-            * tlw::vec4(0.f, 0.f, 0.2f, 1.f));
+            camera_position = camera_position + Vec3{0.f, 0.f, 0.01f};
         }
 
-        float ratio;
-        int width, height;
-        mat4x4 m, p, mvp;
- 
-        glfwGetFramebufferSize(window, &width, &height);
-        ratio = width / (float) height;
- 
         glViewport(0, 0, width, height);
-        glClear(GL_COLOR_BUFFER_BIT);
- 
-        mat4x4_identity(m);
-        mat4x4_rotate_Z(m, m, (float) glfwGetTime());
-        mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-        mat4x4_mul(mvp, p, m);
- 
-        auto camera =  rotation_y(angle_y) * translation(camera_position);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glProgramUniformMatrix4fv(
-            program,
-            glGetUniformLocation(program, "camera"),
-            1,
-            false,
-            camera.elements.data());
+        gl::use(program);
 
-        glUseProgram(program);
-        glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
-        glDrawArrays(GL_TRIANGLES, 0, sizeof(vertices) / sizeof(Vertex));
+        {
+            auto model = rotation_y(object_y_angle) * rotation_x(object_x_angle) * scaling(0.5f) * translation(0.f, 0.f, 0.5f);
+            auto view = translation(camera_position);
+            auto mvp = view * model;
+            glUniformMatrix4fv(
+                gl::uniform_location(program, "mvp"),
+                1, GL_FALSE, mvp.elements.data());
+        }
+        
+        gl::draw_elements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*) 0);
  
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -198,6 +226,12 @@ int throwing_main(void) {
 int main() {
     try {
         return throwing_main();
+    } catch(const gl::Error& e) {
+        std::cerr << "tlw::gl::Error(" << std::hex << e.category() << ")" << std::endl;
+    } catch(const gl::CompilationFailure&) {
+        std::cerr << "tlw::gl::CompilationFailure" << std::endl;
+    } catch(const gl::LinkageFailure&) {
+        std::cerr << "tlw::gl::LinkageFailure" << std::endl;
     } catch(const std::exception& e) {
         std::cerr << "std::exception: " << e.what() << std::endl;
     } catch(...) {
