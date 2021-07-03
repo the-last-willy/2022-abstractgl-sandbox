@@ -45,6 +45,11 @@ auto fragment_shader() {
 }
 
 inline
+auto geometry_shader() {
+    return Shader(GL_GEOMETRY_SHADER);
+}
+
+inline
 auto vertex_shader() {
     return Shader(GL_VERTEX_SHADER);
 }

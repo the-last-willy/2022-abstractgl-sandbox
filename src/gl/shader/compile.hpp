@@ -19,7 +19,7 @@ GLboolean try_compile(const Shader& s) {
     return compile_status(s);
 }
 
-std::string compile(const Shader& s) {
+void compile(const Shader& s) {
     auto success = try_compile(s);
     if(!success) {
         throw CompilationFailure();

@@ -27,7 +27,9 @@ struct Vector {
     std::array<Type, Size> elements = {};
 };
 
+using Vec2 = Vector<2, float>;
 using Vec3 = Vector<3, float>;
+using Vec4 = Vector<4, float>;
 
 constexpr
 auto vec3(float x, float y, float z) {

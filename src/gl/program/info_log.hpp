@@ -12,7 +12,7 @@ inline
 std::string info_log(const Program& p) {
     auto l = info_log_length(p);
     auto str = std::string(l, '\0');
-    glGetShaderInfoLog(p, l, NULL, str.data());
+    glGetProgramInfoLog(p, l, NULL, str.data());
     return str;
 }
 

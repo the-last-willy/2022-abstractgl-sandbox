@@ -22,6 +22,7 @@ target_include_directories(setup
 PRIVATE
     libs/glad/include
     libs/glfw-3.3.4/deps
+    libs/tiny_obj_loader-1.0.7
     src
 )
 

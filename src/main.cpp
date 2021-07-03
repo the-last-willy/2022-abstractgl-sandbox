@@ -1,4 +1,5 @@
 #include "gl/all.hpp"
+#include "scene/all.hpp"
 
 #include "matrix/all.hpp"
 #include "vector/all.hpp"
@@ -9,12 +10,17 @@
 
 #include <glad/glad.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <span>
+#include <vector>
  
 using namespace tlw;
 
@@ -43,7 +49,7 @@ int throwing_main(void) {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     
-        window = glfwCreateWindow(1280, 720, "Cube.", NULL, NULL);
+        window = glfwCreateWindow(1280, 720, "Spot on.", NULL, NULL);
         if (!window)
         {
             glfwTerminate();
@@ -61,69 +67,111 @@ int throwing_main(void) {
         }
     }
 
-    const auto vertex_colors = std::array{
-        Vec3{0.f, 0.f, 0.f},
-        Vec3{0.f, 0.f, 1.f},
-        Vec3{0.f, 1.f, 0.f},
-        Vec3{0.f, 1.f, 1.f},
-        Vec3{1.f, 0.f, 0.f},
-        Vec3{1.f, 0.f, 1.f},
-        Vec3{1.f, 1.f, 0.f},
-        Vec3{1.f, 1.f, 1.f}
-    };
+    auto position_indices = std::vector<unsigned>{};
+    auto positions = std::vector<Vec3>{};
+    {
+        std::string inputfile = root + "/data/wavefront/spot/spot_triangulated.obj";
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
 
-    auto vertex_positions = std::array{
-        Vec3{-0.5f, -0.5f, -0.5f},
-        Vec3{-0.5f, -0.5f,  0.5f},
-        Vec3{-0.5f,  0.5f, -0.5f},
-        Vec3{-0.5f,  0.5f,  0.5f},
-        Vec3{ 0.5f, -0.5f, -0.5f},
-        Vec3{ 0.5f, -0.5f,  0.5f},
-        Vec3{ 0.5f,  0.5f, -0.5f},
-        Vec3{ 0.5f,  0.5f,  0.5f}
-    };
+        std::string warn;
+        std::string err;
+        bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, inputfile.c_str());
+        if (!err.empty()) { // `err` may contain warning message.
+            std::cerr << err << std::endl;
+        }
 
-    const auto triangle_indices = std::array{
-        0u, 3u, 1u, 0u, 2u, 3u, // -x face
-        4u, 7u, 5u, 4u, 6u, 7u, // +x face
-        0u, 1u, 5u, 0u, 5u, 4u, // -y face
-        2u, 7u, 3u, 2u, 6u, 7u, // +y face
-        0u, 6u, 2u, 0u, 4u, 6u, // -z face
-        1u, 3u, 7u, 1u, 7u, 5u  // +z face
-    };
+        if (!ret) {
+            exit(1);
+        }
+
+        auto& shape = shapes.front();
+
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+            int fv = shape.mesh.num_face_vertices[f];
+            for (size_t v = 0; v < fv; v++) {
+                tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
+
+                tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index+0];
+                tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index+1];
+                tinyobj::real_t vz = attrib.vertices[3*idx.vertex_index+2];
+                position_indices.push_back(static_cast<unsigned>(idx.vertex_index));
+                positions.push_back(vec3(vx, vy, vz));
+
+                // tinyobj::real_t nx = attrib.normals[3*idx.normal_index+0];
+                // tinyobj::real_t ny = attrib.normals[3*idx.normal_index+1];
+                // tinyobj::real_t nz = attrib.normals[3*idx.normal_index+2];
+                // tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
+                // tinyobj::real_t ty = attrib.texcoords[2*idx.texcoord_index+1];
+
+            }
+            index_offset += fv;
+        }
+    }
+
+    auto normals = std::vector<Vec3>{};
+    {
+        // for(auto v : position_indices) {
+        //     for(i)
+        // }
+    }
+
+    // const auto vertex_colors = std::array{
+    //     Vec3{0.f, 0.f, 0.f},
+    //     Vec3{0.f, 0.f, 1.f},
+    //     Vec3{0.f, 1.f, 0.f},
+    //     Vec3{0.f, 1.f, 1.f},
+    //     Vec3{1.f, 0.f, 0.f},
+    //     Vec3{1.f, 0.f, 1.f},
+    //     Vec3{1.f, 1.f, 0.f},
+    //     Vec3{1.f, 1.f, 1.f}
+    // };
+
+    // auto vertex_positions = std::array{
+    //     Vec3{-0.5f, -0.5f, -0.5f},
+    //     Vec3{-0.5f, -0.5f,  0.5f},
+    //     Vec3{-0.5f,  0.5f, -0.5f},
+    //     Vec3{-0.5f,  0.5f,  0.5f},
+    //     Vec3{ 0.5f, -0.5f, -0.5f},
+    //     Vec3{ 0.5f, -0.5f,  0.5f},
+    //     Vec3{ 0.5f,  0.5f, -0.5f},
+    //     Vec3{ 0.5f,  0.5f,  0.5f}
+    // };
+
+    // const auto triangle_indices = std::array{
+    //     0u, 1u, 2u, 1u, 3u, 2u, // -x face
+    //     4u, 6u, 5u, 7u, 5u, 6u, // +x face
+    //     0u, 4u, 1u, 4u, 5u, 1u, // -y face
+    //     2u, 3u, 6u, 7u, 6u, 3u, // +y face
+    //     0u, 2u, 4u, 6u, 4u, 2u, // -z face
+    //     1u, 5u, 3u, 7u, 3u, 5u  // +z face
+    // };
 
     auto va = gl::VertexArray();
     gl::bind(va);
 
-    auto colors_buffer = gl::Buffer();
-    {
-        gl::bind_to_array(colors_buffer);
-        gl::storage(colors_buffer, std::span(vertex_colors));
-
-        gl::enable(va, 1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 12, 0);
-    }
-
     auto positions_buffer = gl::Buffer();
     {
         gl::bind_to_array(positions_buffer);
-        gl::storage(positions_buffer, std::span(vertex_positions));
+        gl::storage(positions_buffer, std::span(positions));
 
         gl::enable(va, 0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, 0);
     }
 
-    auto element_array_buffer = gl::Buffer();
-    {
-        gl::bind_to_element_array(element_array_buffer);
-        gl::storage(element_array_buffer, std::span(triangle_indices));
-    }
+    // auto element_array_buffer = gl::Buffer();
+    // {
+    //     gl::bind_to_element_array(element_array_buffer);
+    //     gl::storage(element_array_buffer, std::span(indices));
+    // }
 
     auto program = gl::Program();
     {
         auto vs = vertex_shader();
         {
-            source(vs, file(root + "data/shader/pass_through.vs"));
+            source(vs, file(root + "data/shader/flat_shading.vs"));
             auto success = gl::try_compile(vs);
             if(success) {
                 std::cout << "-- Vertex shader compilation succeeded." << std::endl;
@@ -131,11 +179,25 @@ int throwing_main(void) {
                 std::cerr << info_log(vs) << std::endl;
                 throw gl::CompilationFailure();
             }
+            gl::attach(program, vs);
+        }
+
+        auto gs = geometry_shader();
+        {
+            source(gs, file(root + "data/shader/flat_shading.gs"));
+            auto success = gl::try_compile(gs);
+            if(success) {
+                std::cout << "-- Geometry shader compilation succeeded." << std::endl;
+            } else {
+                std::cerr << info_log(gs) << std::endl;
+                throw gl::CompilationFailure();
+            }
+            gl::attach(program, gs);
         }
 
         auto fs = fragment_shader();
         {
-            source(fs, file(root + "data/shader/pass_through.fs"));
+            source(fs, file(root + "data/shader/flat_shading.fs"));
             auto success = gl::try_compile(fs);
             if(success) {
                 std::cout << "-- Fragment shader compilation succeeded." << std::endl;
@@ -143,10 +205,9 @@ int throwing_main(void) {
                 std::cerr << info_log(fs) << std::endl;
                 throw gl::CompilationFailure();
             }
+            gl::attach(program, fs);
         }
 
-        gl::attach(program, vs);
-        gl::attach(program, fs);
         {
             auto success = gl::try_link(program);
             if(success) {
@@ -162,39 +223,40 @@ int throwing_main(void) {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
 
-    auto camera_position = Vec3{0.f, 0.f, 0.f};
-    auto camera_y_angle = 0.f;
+    auto camera = scene::Camera();
+    y(camera.position) += 0.f;
+    camera.pitch += pi / 8.f;
+    camera.offset = 2.1f;
 
-    auto object_x_angle = 0.f;
-    auto object_y_angle = 0.f;
+    auto object_position_1 = Vec3{0.f, 0.f, 0.f};
 
-    glEnable(GL_DEPTH_TEST);
+    glCullFace(GL_FRONT);
+    glEnable(GL_CULL_FACE);
+    
     glDepthFunc(GL_LESS);
+    glEnable(GL_DEPTH_TEST);
 
     while(!glfwWindowShouldClose(window)) {
         if(glfwGetKey(window, GLFW_KEY_A)) {
-            camera_y_angle -= 0.02f;
+            camera.yaw += 0.02f;
         }
-        if(glfwGetKey(window, GLFW_KEY_D)) {
-            camera_y_angle += 0.02f;
+        // if(glfwGetKey(window, GLFW_KEY_D))
+        {
+            camera.yaw -= 0.002f;
         }
         if(glfwGetKey(window, GLFW_KEY_DOWN)) {
-            object_x_angle -= 0.02f;
-        }
-        if(glfwGetKey(window, GLFW_KEY_LEFT)) {
-            object_y_angle -= 0.02f;
-        }
-        if(glfwGetKey(window, GLFW_KEY_RIGHT)) {
-            object_y_angle += 0.02f;
+            camera.pitch += 0.02f;
         }
         if(glfwGetKey(window, GLFW_KEY_S)) {
-            camera_position = camera_position + Vec3{0.f, 0.f, -0.01f};
+            camera.position = camera.position
+            + xyz(scene::rotation(camera) * Vec4{0.f, 0.f, -0.02f, 1.f});
         }
         if(glfwGetKey(window, GLFW_KEY_UP)) {
-            object_x_angle += 0.02f;
+            camera.pitch -= 0.02f;
         }
         if(glfwGetKey(window, GLFW_KEY_W)) {
-            camera_position = camera_position + Vec3{0.f, 0.f, 0.01f};
+            camera.position = camera.position
+            + xyz(scene::rotation(camera) * Vec4{0.f, 0.f, 0.02f, 1.f});
         }
 
         glViewport(0, 0, width, height);
@@ -202,16 +264,22 @@ int throwing_main(void) {
 
         gl::use(program);
 
+        auto view = scene::transformation(camera);
+        auto projection = scene::perspective(camera);
+
         {
-            auto model = rotation_y(object_y_angle) * rotation_x(object_x_angle) * scaling(0.5f) * translation(0.f, 0.f, 0.5f);
-            auto view = translation(camera_position);
-            auto mvp = view * model;
+            auto model = translation(object_position_1);
+            auto mv = view * model;
+            auto mvp = projection * view * model;
+
+            glUniformMatrix4fv(
+                gl::uniform_location(program, "m"),
+                1, GL_FALSE, model.elements.data());
             glUniformMatrix4fv(
                 gl::uniform_location(program, "mvp"),
                 1, GL_FALSE, mvp.elements.data());
+            gl::draw_arrays(GL_TRIANGLES, 0, positions.size());
         }
-        
-        gl::draw_elements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*) 0);
  
         glfwSwapBuffers(window);
         glfwPollEvents();
