@@ -8,7 +8,12 @@
 #include "pi.hpp"
 #include "root.hpp"
 
+// External libraries.
+
 #include <glad/glad.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -22,6 +27,8 @@
 #include <span>
 #include <vector>
  
+//
+
 using namespace tlw;
 
 static void error_callback(int error, const char* description)
@@ -69,6 +76,7 @@ int throwing_main(void) {
 
     auto position_indices = std::vector<unsigned>{};
     auto positions = std::vector<Vec3>{};
+    auto uvs = std::vector<Vec2>{};
     {
         std::string inputfile = root + "/data/wavefront/spot/spot_triangulated.obj";
         tinyobj::attrib_t attrib;
@@ -103,9 +111,10 @@ int throwing_main(void) {
                 // tinyobj::real_t nx = attrib.normals[3*idx.normal_index+0];
                 // tinyobj::real_t ny = attrib.normals[3*idx.normal_index+1];
                 // tinyobj::real_t nz = attrib.normals[3*idx.normal_index+2];
-                // tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
-                // tinyobj::real_t ty = attrib.texcoords[2*idx.texcoord_index+1];
 
+                tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
+                tinyobj::real_t ty = attrib.texcoords[2*idx.texcoord_index+1];
+                uvs.push_back(Vec2{tx, ty});
             }
             index_offset += fv;
         }
@@ -118,37 +127,6 @@ int throwing_main(void) {
         // }
     }
 
-    // const auto vertex_colors = std::array{
-    //     Vec3{0.f, 0.f, 0.f},
-    //     Vec3{0.f, 0.f, 1.f},
-    //     Vec3{0.f, 1.f, 0.f},
-    //     Vec3{0.f, 1.f, 1.f},
-    //     Vec3{1.f, 0.f, 0.f},
-    //     Vec3{1.f, 0.f, 1.f},
-    //     Vec3{1.f, 1.f, 0.f},
-    //     Vec3{1.f, 1.f, 1.f}
-    // };
-
-    // auto vertex_positions = std::array{
-    //     Vec3{-0.5f, -0.5f, -0.5f},
-    //     Vec3{-0.5f, -0.5f,  0.5f},
-    //     Vec3{-0.5f,  0.5f, -0.5f},
-    //     Vec3{-0.5f,  0.5f,  0.5f},
-    //     Vec3{ 0.5f, -0.5f, -0.5f},
-    //     Vec3{ 0.5f, -0.5f,  0.5f},
-    //     Vec3{ 0.5f,  0.5f, -0.5f},
-    //     Vec3{ 0.5f,  0.5f,  0.5f}
-    // };
-
-    // const auto triangle_indices = std::array{
-    //     0u, 1u, 2u, 1u, 3u, 2u, // -x face
-    //     4u, 6u, 5u, 7u, 5u, 6u, // +x face
-    //     0u, 4u, 1u, 4u, 5u, 1u, // -y face
-    //     2u, 3u, 6u, 7u, 6u, 3u, // +y face
-    //     0u, 2u, 4u, 6u, 4u, 2u, // -z face
-    //     1u, 5u, 3u, 7u, 3u, 5u  // +z face
-    // };
-
     auto va = gl::VertexArray();
     gl::bind(va);
 
@@ -158,20 +136,23 @@ int throwing_main(void) {
         gl::storage(positions_buffer, std::span(positions));
 
         gl::enable(va, 0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, 0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
     }
 
-    // auto element_array_buffer = gl::Buffer();
-    // {
-    //     gl::bind_to_element_array(element_array_buffer);
-    //     gl::storage(element_array_buffer, std::span(indices));
-    // }
+    auto uvs_buffer = gl::Buffer();
+    {
+        gl::bind_to_array(uvs_buffer);
+        gl::storage(uvs_buffer, std::span(uvs));
+
+        gl::enable(va, 1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
+    }
 
     auto program = gl::Program();
     {
         auto vs = vertex_shader();
         {
-            source(vs, file(root + "data/shader/flat_shading.vs"));
+            source(vs, file(root + "data/shader/texture.vs"));
             auto success = gl::try_compile(vs);
             if(success) {
                 std::cout << "-- Vertex shader compilation succeeded." << std::endl;
@@ -182,22 +163,22 @@ int throwing_main(void) {
             gl::attach(program, vs);
         }
 
-        auto gs = geometry_shader();
-        {
-            source(gs, file(root + "data/shader/flat_shading.gs"));
-            auto success = gl::try_compile(gs);
-            if(success) {
-                std::cout << "-- Geometry shader compilation succeeded." << std::endl;
-            } else {
-                std::cerr << info_log(gs) << std::endl;
-                throw gl::CompilationFailure();
-            }
-            gl::attach(program, gs);
-        }
+        // auto gs = geometry_shader();
+        // {
+        //     source(gs, file(root + "data/shader/flat_shading.gs"));
+        //     auto success = gl::try_compile(gs);
+        //     if(success) {
+        //         std::cout << "-- Geometry shader compilation succeeded." << std::endl;
+        //     } else {
+        //         std::cerr << info_log(gs) << std::endl;
+        //         throw gl::CompilationFailure();
+        //     }
+        //     gl::attach(program, gs);
+        // }
 
         auto fs = fragment_shader();
         {
-            source(fs, file(root + "data/shader/flat_shading.fs"));
+            source(fs, file(root + "data/shader/texture.fs"));
             auto success = gl::try_compile(fs);
             if(success) {
                 std::cout << "-- Fragment shader compilation succeeded." << std::endl;
@@ -219,7 +200,25 @@ int throwing_main(void) {
         }
         gl::use(program);
     }
-    
+
+    auto texture = gl::texture2();
+    {
+        int width, height, n;
+        auto data = stbi_load(
+            (root + "/data/wavefront/spot/spot_texture.png").c_str(),
+            &width, &height, &n, 3);
+        
+        gl::bind_to_texture2(texture);
+        glTexImage2D(
+            GL_TEXTURE_2D, 0, GL_RGB,
+            width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        gl::throw_if_error();
+        // glGenerateMipmap(GL_TEXTURE_2D);
+        gl::throw_if_error();
+
+        stbi_image_free(data);
+    }
+
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
 
@@ -235,6 +234,9 @@ int throwing_main(void) {
     
     glDepthFunc(GL_LESS);
     glEnable(GL_DEPTH_TEST);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
     while(!glfwWindowShouldClose(window)) {
         if(glfwGetKey(window, GLFW_KEY_A)) {
@@ -272,12 +274,13 @@ int throwing_main(void) {
             auto mv = view * model;
             auto mvp = projection * view * model;
 
-            glUniformMatrix4fv(
-                gl::uniform_location(program, "m"),
-                1, GL_FALSE, model.elements.data());
+            // glUniformMatrix4fv(
+            //     gl::uniform_location(program, "m"),
+            //     1, GL_FALSE, model.elements.data());
             glUniformMatrix4fv(
                 gl::uniform_location(program, "mvp"),
                 1, GL_FALSE, mvp.elements.data());
+            gl::bind_to_texture2(texture);
             gl::draw_arrays(GL_TRIANGLES, 0, positions.size());
         }
  

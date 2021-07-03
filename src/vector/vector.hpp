@@ -28,6 +28,7 @@ struct Vector {
 };
 
 using Vec2 = Vector<2, float>;
+using Vec2u = Vector<2, unsigned>;
 using Vec3 = Vector<3, float>;
 using Vec4 = Vector<4, float>;
 
