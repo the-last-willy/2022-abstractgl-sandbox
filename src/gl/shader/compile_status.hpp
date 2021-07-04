@@ -3,11 +3,13 @@
 #include "shader.hpp"
 
 namespace tlw {
+namespace gl {
 
-GLboolean compile_status(const Shader& s) {
+template<typename Any>
+GLboolean compile_status(const Shader<Any>& s) {
     GLint value;
     glGetShaderiv(s, GL_COMPILE_STATUS, &value);
     return static_cast<GLboolean>(value);
 }
 
-}
+}}

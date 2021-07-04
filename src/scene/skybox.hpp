@@ -17,7 +17,7 @@ public:
     Skybox(std::map<GLenum, std::string> images) {
         // Program.
         {
-            auto vs = vertex_shader();
+            auto vs = gl::VertexShader();
             {
                 source(vs, file(root + "data/shader/skybox.vs"));
                 auto success = gl::try_compile(vs);
@@ -29,7 +29,7 @@ public:
                 }
                 gl::attach(program, vs);
             }
-            auto fs = fragment_shader();
+            auto fs = gl::FragmentShader();
             {
                 source(fs, file(root + "data/shader/skybox.fs"));
                 auto success = gl::try_compile(fs);
@@ -54,7 +54,7 @@ public:
         // Texture.
         {
             gl::active_texture(0);
-            gl::bind_to_cube_map(texture);
+            gl::bind(texture);
             for(const auto& [face, filepath] : images) {
                 stbi_set_flip_vertically_on_load(true);  
 
@@ -89,7 +89,7 @@ public:
     gl::VertexArray vertices = {};
     gl::Buffer positions = {};
     gl::Program program = {};
-    gl::Texture texture = gl::cube_map();
+    gl::CubeMap texture = {};
 };
 
 }

@@ -2,6 +2,7 @@
 
 #include "buffer/all.hpp"
 #include "exception/all.hpp"
+#include "object/all.hpp"
 #include "program/all.hpp"
 #include "shader/all.hpp"
 #include "texture/all.hpp"

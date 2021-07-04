@@ -169,9 +169,9 @@ int throwing_main(void) {
 
     auto program = gl::Program();
     {
-        auto vs = vertex_shader();
+        auto vs = gl::VertexShader();
         {
-            source(vs, file(root + "data/shader/texture.vs"));
+            source(vs, file(root + "src/shader/texture.vs"));
             auto success = gl::try_compile(vs);
             if(success) {
                 std::cout << "-- Vertex shader compilation succeeded." << std::endl;
@@ -182,7 +182,7 @@ int throwing_main(void) {
             gl::attach(program, vs);
         }
 
-        // auto gs = geometry_shader();
+        // auto gs = gl::GeometryShader();
         // {
         //     source(gs, file(root + "data/shader/flat_shading.gs"));
         //     auto success = gl::try_compile(gs);
@@ -195,9 +195,9 @@ int throwing_main(void) {
         //     gl::attach(program, gs);
         // }
 
-        auto fs = fragment_shader();
+        auto fs = gl::FragmentShader();
         {
-            source(fs, file(root + "data/shader/texture.fs"));
+            source(fs, file(root + "src/shader/texture.fs"));
             auto success = gl::try_compile(fs);
             if(success) {
                 std::cout << "-- Fragment shader compilation succeeded." << std::endl;
@@ -220,7 +220,7 @@ int throwing_main(void) {
         gl::use(program);
     }
 
-    auto texture = gl::texture2();
+    auto texture = gl::Texture2();
     {
         stbi_set_flip_vertically_on_load(true);  
 
@@ -230,7 +230,7 @@ int throwing_main(void) {
             &width, &height, &n, 3);
         
         gl::active_texture(0);
-        gl::bind_to_texture2(texture);
+        gl::bind(texture);
         glTexImage2D(
             GL_TEXTURE_2D, 0, GL_RGB,
             width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
@@ -312,7 +312,8 @@ int throwing_main(void) {
             glUniformMatrix4fv(
                 gl::uniform_location(program, "mvp"),
                 1, GL_FALSE, mvp.elements.data());
-            gl::bind_to_texture2(texture);
+            gl::active_texture(0);
+            gl::bind(texture);
             gl::draw_arrays(GL_TRIANGLES, 0, positions.size());
         }
  

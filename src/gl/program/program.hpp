@@ -2,35 +2,23 @@
 
 #include "gl/object/object.hpp"
 
-#include <stdexcept>
-
 namespace tlw {
 namespace gl {
 
-class Program : public Object {
-public:
-    Program()
-        : name_(glCreateProgram())
-    {}
-
-    ~Program() noexcept {
-        glDeleteProgram(name_);
+struct ProgramTraits {
+    static GLuint create() {
+        return glCreateProgram();
     }
 
-    GLuint name() const {
-        if(!glIsProgram(name_)) {
-            throw std::runtime_error(
-                "Program: Invalid object name.");
-        }
-        return name_;
+    static void delete_(GLuint name) {
+        glDeleteProgram(name);
     }
 
-    operator GLuint() const {
-        return name();
+    static GLboolean is(GLuint name) {
+        return glIsProgram(name);
     }
-
-private:
-    GLuint name_ = 0;
 };
+
+using Program = Object<ProgramTraits>;
 
 }}

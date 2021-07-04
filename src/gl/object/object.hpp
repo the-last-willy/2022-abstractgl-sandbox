@@ -1,5 +1,10 @@
 #pragma once
 
+#include "traits.hpp"
+
+#include "gl/exception/error/throw_if_error.hpp"
+#include "gl/exception/invariant_violation.hpp"
+
 #include <glad/glad.h>
 
 #include <utility>
@@ -7,15 +12,14 @@
 namespace tlw {
 namespace gl {
 
-
-
+template<ObjectTraits Traits>
 class Object {
-protected:
-    Object() noexcept = default;
+public:
+    using traits_type = Traits;
 
-    Object(GLuint name) noexcept
-        : name_{name}
-    {}
+    Object() {
+        throw_if_error();
+    };
 
     Object(const Object&) = delete;
 
@@ -31,11 +35,24 @@ protected:
         return *this;
     }
 
-    GLuint name() const noexcept {
+    ~Object() {
+        Traits::delete_(name_);
+    }
+
+    GLuint name() const {
+        if(!Traits::is(name_)) {
+            throw InvariantViolation();
+        }
         return name_;
     }
 
-    GLuint name_ = 0;
+    operator GLuint() const {
+        return name();
+    }
+    
+
+private:
+    GLuint name_ = Traits::create();
 };
 
 }}

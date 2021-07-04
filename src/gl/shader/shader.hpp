@@ -1,57 +1,22 @@
 #pragma once
 
-#include <glad/glad.h>
-
-#include <stdexcept>
+#include "gl/object/object.hpp"
 
 namespace tlw {
+namespace gl {
 
-struct Shader {
-    Shader(GLenum type)
-        : id_{glCreateShader(type)}
-    {
-        if(id_ == 0) {
-            auto error = glGetError();
-            if(error == GL_INVALID_ENUM) {
-                throw std::logic_error("Shader: Invalid enum.");
-            } else {
-                throw std::runtime_error("Shader: \"glCreateShader\" failed.");
-            }
-        }
+template<typename Subtraits>
+struct ShaderTraits : Subtraits {
+    static void delete_(GLuint name) {
+        glDeleteShader(name);
     }
 
-    ~Shader() noexcept {
-        glDeleteShader(id_);
+    static GLboolean is(GLuint name) {
+        return glIsShader(name);
     }
-
-    GLuint id() const {
-        if(!glIsShader(id_)) {
-            throw std::runtime_error("Shader: Not a valid shader id.");
-        }
-        return id_;
-    }
-
-    operator GLuint() const {
-        return id();
-    }
-
-private:
-    GLuint id_ = 0;
 };
 
-inline
-auto fragment_shader() {
-    return Shader(GL_FRAGMENT_SHADER);
-}
+template<typename Any>
+using Shader = Object<ShaderTraits<Any>>;
 
-inline
-auto geometry_shader() {
-    return Shader(GL_GEOMETRY_SHADER);
-}
-
-inline
-auto vertex_shader() {
-    return Shader(GL_VERTEX_SHADER);
-}
-
-}
+}}

@@ -5,11 +5,13 @@
 #include <string>
 
 namespace tlw {
+namespace gl {
 
-void source(const Shader& sh, const std::string& str) {
+template<typename Any>
+void source(const Shader<Any>& sh, const std::string& str) {
     auto string = str.data();
     auto length = static_cast<GLint>(std::size(str));
     glShaderSource(sh, 1, &string, &length);
 }
 
-}
+}}
