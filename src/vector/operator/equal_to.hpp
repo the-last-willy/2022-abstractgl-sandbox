@@ -5,11 +5,15 @@
 namespace tlw {
 
 template<std::size_t Size, typename Type> constexpr
-auto& operator-=(Vector<Size, Type> lv, const Vector<Size, Type>& rv) {
+bool operator==(
+    const Vector<Size, Type>& lv,
+    const Vector<Size, Type>& rv)
+{
+    auto b = true;
     for(std::size_t i = 0; i < Size; ++i) {
-        lv.at(i) -= rv.at(i);
+        b = b && (lv.at(i) == rv.at(i));
     }
-    return lv;
+    return b;
 }
 
 }

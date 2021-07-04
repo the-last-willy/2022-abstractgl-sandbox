@@ -43,6 +43,11 @@ private:
 };
 
 inline
+auto cube_map() {
+    return Texture(GL_TEXTURE_CUBE_MAP);
+}
+
+inline
 auto texture2() {
     return Texture(GL_TEXTURE_2D);
 }

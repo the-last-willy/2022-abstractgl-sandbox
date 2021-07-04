@@ -74,7 +74,7 @@ int throwing_main(void) {
         }
     }
 
-    auto position_indices = std::vector<unsigned>{};
+    auto normals = std::vector<Vec3>{};
     auto positions = std::vector<Vec3>{};
     auto uvs = std::vector<Vec2>{};
     {
@@ -105,7 +105,6 @@ int throwing_main(void) {
                 tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index+0];
                 tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index+1];
                 tinyobj::real_t vz = attrib.vertices[3*idx.vertex_index+2];
-                position_indices.push_back(static_cast<unsigned>(idx.vertex_index));
                 positions.push_back(vec3(vx, vy, vz));
 
                 // tinyobj::real_t nx = attrib.normals[3*idx.normal_index+0];
@@ -120,15 +119,35 @@ int throwing_main(void) {
         }
     }
 
-    auto normals = std::vector<Vec3>{};
-    {
-        // for(auto v : position_indices) {
-        //     for(i)
-        // }
+    { // Normals computation.
+        normals.resize(positions.size());
+        for(std::size_t n = 0; n < size(normals); ++ n) {
+            auto normal = vec3(0.f, 0.f, 0.f);
+            auto pn = positions[n];
+            for(std::size_t p = 0; p < size(positions); p += 3) {
+                auto p0 = positions[p];
+                auto p1 = positions[p + 1];
+                auto p2 = positions[p + 2];
+                if(p0 == pn || p1 == pn || p2 == pn) {
+                    normal += cross(p1 - p0, p2 - p0);
+                }
+                
+            }
+            normals[n] = normalized(normal);
+        }
     }
 
     auto va = gl::VertexArray();
     gl::bind(va);
+
+    auto normals_buffer = gl::Buffer();
+    {
+        gl::bind_to_array(normals_buffer);
+        gl::storage(normals_buffer, std::span(normals));
+
+        gl::enable(va, 2);
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+    }
 
     auto positions_buffer = gl::Buffer();
     {
@@ -203,17 +222,18 @@ int throwing_main(void) {
 
     auto texture = gl::texture2();
     {
+        stbi_set_flip_vertically_on_load(true);  
+
         int width, height, n;
         auto data = stbi_load(
             (root + "/data/wavefront/spot/spot_texture.png").c_str(),
             &width, &height, &n, 3);
         
+        gl::active_texture(0);
         gl::bind_to_texture2(texture);
         glTexImage2D(
             GL_TEXTURE_2D, 0, GL_RGB,
             width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        gl::throw_if_error();
-        // glGenerateMipmap(GL_TEXTURE_2D);
         gl::throw_if_error();
 
         stbi_image_free(data);
@@ -237,6 +257,18 @@ int throwing_main(void) {
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    try {
+        auto skybox = Skybox({
+            {GL_TEXTURE_CUBE_MAP_NEGATIVE_X, root + "/data/cubemap/canyons/right.jpg"},
+            {GL_TEXTURE_CUBE_MAP_POSITIVE_X, root + "/data/cubemap/canyons/left.jpg"},
+            {GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, root + "/data/cubemap/canyons/down.jpg"},
+            {GL_TEXTURE_CUBE_MAP_POSITIVE_Y, root + "/data/cubemap/canyons/up.jpg"},
+            {GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, root + "/data/cubemap/canyons/bw.jpg"},
+            {GL_TEXTURE_CUBE_MAP_POSITIVE_Z, root + "/data/cubemap/canyons/fw.jpg"}});
+    } catch(...) {
+        std::cerr << "Skybox failed." << std::endl;
+    }
 
     while(!glfwWindowShouldClose(window)) {
         if(glfwGetKey(window, GLFW_KEY_A)) {
@@ -274,9 +306,9 @@ int throwing_main(void) {
             auto mv = view * model;
             auto mvp = projection * view * model;
 
-            // glUniformMatrix4fv(
-            //     gl::uniform_location(program, "m"),
-            //     1, GL_FALSE, model.elements.data());
+            glUniformMatrix4fv(
+                gl::uniform_location(program, "m"),
+                1, GL_FALSE, model.elements.data());
             glUniformMatrix4fv(
                 gl::uniform_location(program, "mvp"),
                 1, GL_FALSE, mvp.elements.data());
@@ -301,6 +333,8 @@ int main() {
         std::cerr << "tlw::gl::Error(" << std::hex << e.category() << ")" << std::endl;
     } catch(const gl::CompilationFailure&) {
         std::cerr << "tlw::gl::CompilationFailure" << std::endl;
+    } catch(const gl::InvariantViolation&) {
+        std::cerr << "tlw::gl::InvariantViolation" << std::endl;
     } catch(const gl::LinkageFailure&) {
         std::cerr << "tlw::gl::LinkageFailure" << std::endl;
     } catch(const std::exception& e) {
