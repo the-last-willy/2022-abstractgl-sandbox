@@ -61,11 +61,19 @@ public:
     std::array<Type, ColumnCount * RowCount> elements = {}; 
 };
 
-
 using Mat2 = Matrix<2, 2, float>;
 using Mat2x3 = Matrix<2, 3, float>;
 using Mat3 = Matrix<3, 3, float>;
 using Mat3x2 = Matrix<3, 2, float>;
 using Mat4 = Matrix<4, 4, float>;
+
+inline
+auto mat4_identity() {
+    return Mat4{
+        1.f, 0.f, 0.f, 0.f,
+        0.f, 1.f, 0.f, 0.f,
+        0.f, 0.f, 1.f, 0.f,
+        0.f, 0.f, 0.f, 1.f};
+}
 
 }

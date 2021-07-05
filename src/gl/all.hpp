@@ -6,5 +6,6 @@
 #include "program/all.hpp"
 #include "shader/all.hpp"
 #include "texture/all.hpp"
+#include "uniform/all.hpp"
 #include "vertex_array/all.hpp"
 #include "draw.hpp"

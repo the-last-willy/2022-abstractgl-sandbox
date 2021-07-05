@@ -5,5 +5,4 @@
 #include "info_log.hpp"
 #include "link.hpp"
 #include "program.hpp"
-#include "uniform_location.hpp"
 #include "use.hpp"

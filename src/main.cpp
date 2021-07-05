@@ -74,6 +74,14 @@ int throwing_main(void) {
         }
     }
 
+    auto skybox = Skybox({
+        {GL_TEXTURE_CUBE_MAP_NEGATIVE_X, root + "/data/cubemap/canyons/left.jpg"},
+        {GL_TEXTURE_CUBE_MAP_POSITIVE_X, root + "/data/cubemap/canyons/right.jpg"},
+        {GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, root + "/data/cubemap/canyons/down.jpg"},
+        {GL_TEXTURE_CUBE_MAP_POSITIVE_Y, root + "/data/cubemap/canyons/up.jpg"},
+        {GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, root + "/data/cubemap/canyons/bw.jpg"},
+        {GL_TEXTURE_CUBE_MAP_POSITIVE_Z, root + "/data/cubemap/canyons/fw.jpg"}});
+
     auto normals = std::vector<Vec3>{};
     auto positions = std::vector<Vec3>{};
     auto uvs = std::vector<Vec2>{};
@@ -258,18 +266,6 @@ int throwing_main(void) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    try {
-        auto skybox = Skybox({
-            {GL_TEXTURE_CUBE_MAP_NEGATIVE_X, root + "/data/cubemap/canyons/right.jpg"},
-            {GL_TEXTURE_CUBE_MAP_POSITIVE_X, root + "/data/cubemap/canyons/left.jpg"},
-            {GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, root + "/data/cubemap/canyons/down.jpg"},
-            {GL_TEXTURE_CUBE_MAP_POSITIVE_Y, root + "/data/cubemap/canyons/up.jpg"},
-            {GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, root + "/data/cubemap/canyons/bw.jpg"},
-            {GL_TEXTURE_CUBE_MAP_POSITIVE_Z, root + "/data/cubemap/canyons/fw.jpg"}});
-    } catch(...) {
-        std::cerr << "Skybox failed." << std::endl;
-    }
-
     while(!glfwWindowShouldClose(window)) {
         if(glfwGetKey(window, GLFW_KEY_A)) {
             camera.yaw += 0.02f;
@@ -296,16 +292,17 @@ int throwing_main(void) {
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        gl::use(program);
-
         auto view = scene::transformation(camera);
         auto projection = scene::perspective(camera);
 
-        {
+        { // Spot.
+            gl::bind(va);
+
             auto model = translation(object_position_1);
             auto mv = view * model;
             auto mvp = projection * view * model;
 
+            gl::use(program);
             glUniformMatrix4fv(
                 gl::uniform_location(program, "m"),
                 1, GL_FALSE, model.elements.data());
@@ -315,6 +312,20 @@ int throwing_main(void) {
             gl::active_texture(0);
             gl::bind(texture);
             gl::draw_arrays(GL_TRIANGLES, 0, positions.size());
+        }
+        { // Skybox.
+            gl::bind(skybox.vertex_array);
+            gl::active_texture(0);
+            gl::bind(skybox.texture);
+
+            gl::use(skybox.program);
+
+            auto vp = scene::rotation(camera);
+            glUniformMatrix4fv(
+                gl::uniform_location(skybox.program, "view_projection"),
+                1, GL_FALSE, vp.elements.data());
+
+            gl::draw_arrays(GL_TRIANGLES, 0, 6);
         }
  
         glfwSwapBuffers(window);
