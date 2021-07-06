@@ -1,6 +1,6 @@
 #version 460
 
-uniform mat4 mv;
+uniform mat4 m;
 uniform mat4 mvp;
 uniform mat4 normal_matrix;
 
@@ -12,8 +12,8 @@ out vec3 vertex_normal;
 out vec3 vertex_position;
 
 void main() {
-    vertex_normal = (normal_matrix * vec4(normal, 0.f)).xyz;
-    vertex_position = (mv * vec4(position, 1.f)).xyz;
+    vertex_normal = normalize(transpose(inverse(m)) * vec4(normal, 0.f)).xyz;
+    vertex_position = (m * vec4(position, 1.f)).xyz;
 
     gl_Position = mvp * vec4(position.xy, position.z, 1.f);
 }

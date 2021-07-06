@@ -72,18 +72,23 @@ int throwing_main() {
     }
 
     // Loading the model.
-    auto buffers = std::vector<gl::Buffer>();
-    auto vertex_counts = std::vector<GLsizei>();
-    auto vertex_arrays = std::vector<gl::VertexArray>();
-    auto materials_ = std::vector<tinyobj::material_t>();
+    
+    auto scene = scene::Group<scene::Renderer>();
+    auto car = std::make_shared<scene::Group<scene::Renderer>>();
+
+    for(int i = 0; i < 10; ++i) {
+        auto t = scaling(0.2) * translation(Vec3{float(1.6f * i) - 6.f, 0.f, 0.f});
+        scene.children.emplace_back(new scene::Transformation<scene::Renderer>(t, car));
+    }
+
     {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
         {   
             auto err = std::string{};
-            auto base_dir = std::string("D:/data/3d_model/2020_audi_rs_6_avant");
-            auto filepath = base_dir + "/Audi_RS_6_Avant.obj";
+            auto base_dir = std::string("D:/data/3d_model/the_cabin");
+            auto filepath = base_dir + "/Lighting_Challenge_24_theCabin.obj";
             auto warn = std::string{};
             bool ret = tinyobj::LoadObj(
                 &attrib,
@@ -107,21 +112,18 @@ int throwing_main() {
             }
         }
 
-        buffers.resize(shapes.size());
-        materials_.resize(shapes.size());
-        vertex_counts.resize(shapes.size());
-        vertex_arrays.resize(shapes.size());
-
         for(std::size_t i = 0; i < shapes.size(); ++i) {
             const auto& s = shapes[i];
             auto& m = s.mesh;
 
-            auto& buffer = buffers[i];
-            auto& vertex_array = vertex_arrays[i];
-            
-            vertex_counts[i] = static_cast<GLsizei>(m.indices.size());
+            auto instance = new scene::Instance<scene::Renderer>();
+            car->children.emplace_back(instance);
 
-            materials_[i] = materials[m.material_ids.front()];
+            instance->material = materials[m.material_ids.front()];
+            instance->vertex_count = static_cast<GLsizei>(m.indices.size());
+            
+            auto& buffer = instance->buffer;
+            auto& vertex_array = instance->vertex_array;
 
             auto vertices = std::vector<Vertex>();
             for(auto& idx : m.indices) {
@@ -207,41 +209,37 @@ int throwing_main() {
     glCullFace(GL_FRONT);
     glEnable(GL_CULL_FACE);
 
-    auto camera = scene::Camera();
+    glClearColor(0.f, 1.f, 0.f, 0.f);
+
+    scene::Camera camera = {};
     camera.offset = 3.f;
     camera.pitch = 0.5f;
+
+    auto renderer = scene::Renderer();
+    renderer.program = &program;
+    
     while(!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        camera.yaw += 0.01f;
+        auto p = perspective(camera);
+        renderer.projection = p;
 
-        auto normal_matrix = mat4_identity();
         auto v = transformation(camera);
-        auto vp = perspective(camera) * v;
+        renderer.view = v;
 
-        auto light_dir = xyz(v * normalized(Vec4{-1.f, -1.f, 0.f, 0.f}));
+        camera.yaw += 0.002f;
+        auto camera_pos = xyz(rotation(camera) * vec4(0.f, 0.f, -camera.offset, 1.f));
 
-        for(std::size_t i = 0; i < vertex_arrays.size(); ++i) {
-            gl::use(program);
-            {
-                auto& mat = materials_[i];
-                gl::try_uniform(program, "light_dir",
-                    light_dir);
-                gl::try_uniform(program, "material.ambient",
-                    Vec3{mat.ambient[0], mat.ambient[1], mat.ambient[2]});
-                gl::try_uniform(program, "material.diffuse",
-                    Vec3{mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]});
-                gl::try_uniform(program, "material.shininess",
-                    mat.shininess);
-                gl::try_uniform(program, "material.specular",
-                    Vec3{mat.specular[0], mat.specular[1], mat.specular[2]});
-            }
-            gl::try_uniform(program, "mv", v);
-            gl::try_uniform(program, "mvp", vp);
-            gl::try_uniform(program, "normal_matrix", normal_matrix);
-            gl::bind(vertex_arrays[i]);
-            gl::draw_arrays(GL_TRIANGLES, 0, vertex_counts[i]);
-        }
+        auto light_dir = normalized(Vec3{0.f, -1.f, 0.f});
+
+        gl::use(program);
+
+        gl::try_uniform(program, "camera_pos",
+            camera_pos);
+        gl::try_uniform(program, "light_dir",
+            light_dir);
+
+        car->accept(renderer);
         
         glfwSwapBuffers(window);
         glfwPollEvents();
