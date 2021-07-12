@@ -10,7 +10,7 @@ namespace tlw {
 namespace gl {
 
 inline
-std::optional<GLint> optional_location(const Program& p, const GLchar* name) {
+std::optional<GLint> optional_uniform_location(const Program& p, const GLchar* name) {
     auto l = glGetUniformLocation(p, name);
     throw_if_error();
     if(l == -1) {
@@ -21,8 +21,8 @@ std::optional<GLint> optional_location(const Program& p, const GLchar* name) {
 }
 
 inline
-GLint location(const Program& p, const GLchar* name) {
-    auto l = optional_location(p, name);
+GLint uniform_location(const Program& p, const GLchar* name) {
+    auto l = optional_uniform_location(p, name);
     {
         if(*l == -1) {
             throw std::runtime_error(

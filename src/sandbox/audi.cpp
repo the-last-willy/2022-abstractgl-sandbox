@@ -77,7 +77,7 @@ int throwing_main() {
     auto car = std::make_shared<scene::Group<scene::Renderer>>();
 
     for(int i = 0; i < 10; ++i) {
-        auto t = scaling(0.2) * translation(Vec3{float(1.6f * i) - 6.f, 0.f, 0.f});
+        auto t = scaling(0.4) * translation(Vec3{float(1.6f * i) - 6.f, 0.f, 0.f});
         scene.children.emplace_back(new scene::Transformation<scene::Renderer>(t, car));
     }
 
@@ -87,8 +87,8 @@ int throwing_main() {
         std::vector<tinyobj::material_t> materials;
         {   
             auto err = std::string{};
-            auto base_dir = std::string("D:/data/3d_model/the_cabin");
-            auto filepath = base_dir + "/Lighting_Challenge_24_theCabin.obj";
+            auto base_dir = std::string("D:/data/3d_model/2020_audi_rs_6_avant");
+            auto filepath = base_dir + "/Audi_RS_6_Avant.obj";
             auto warn = std::string{};
             bool ret = tinyobj::LoadObj(
                 &attrib,
@@ -239,7 +239,7 @@ int throwing_main() {
         gl::try_uniform(program, "light_dir",
             light_dir);
 
-        car->accept(renderer);
+        scene.accept(renderer);
         
         glfwSwapBuffers(window);
         glfwPollEvents();

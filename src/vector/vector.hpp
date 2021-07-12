@@ -30,6 +30,8 @@ struct Vector {
 using Vec2 = Vector<2, float>;
 using Vec2u = Vector<2, unsigned>;
 using Vec3 = Vector<3, float>;
+using Vec3i = Vector<3, int>;
+using Vec3u = Vector<3, unsigned>;
 using Vec4 = Vector<4, float>;
 
 constexpr

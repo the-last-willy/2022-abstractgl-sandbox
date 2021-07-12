@@ -57,3 +57,28 @@ target_link_libraries(setup
 PRIVATE
     glfw
 )
+
+# Executable 'terrain'
+
+add_executable(terrain)
+
+target_sources(terrain
+PRIVATE
+    libs/glad/src/glad.c
+    src/sandbox/terrain.cpp
+)
+
+target_include_directories(terrain
+PRIVATE
+    libs/glad/include
+    libs/glfw-3.3.4/deps
+    libs/stb
+    libs/tiny_obj_loader-1.0.7
+    src
+)
+
+target_link_libraries(terrain
+PRIVATE
+    glfw
+)
+

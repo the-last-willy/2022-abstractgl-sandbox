@@ -8,14 +8,14 @@ namespace scene {
 
 struct Camera {
     Vec3 position = {0.f, 0.f, 0.f};
-    float offset = 0.f;
+    float offset = -2.f;
     
     // Aircraft rotation.
     float yaw = 0.f;
     float pitch = 0.f;
 
     float near = 0.1f;
-    float far = 10.f;
+    float far = 1000.f;
 
     float aspect_ratio = 16.f / 9.f;
     // float fov = 90.f;
@@ -34,9 +34,10 @@ auto orthographic(const Camera& c) {
     auto a = 2 / (c.far - c.near);
     auto b = -(c.far + c.near) / (c.far - c.near);
 
+    auto y = c.aspect_ratio;
     return Mat4{ // A line is a column.
         1.f, 0.f, 0.f, 0.f, 
-        0.f, 1.f, 0.f, 0.f,
+        0.f,   y, 0.f, 0.f,
         0.f, 0.f,   a, 0.f,
         0.f, 0.f,   b, 1.f};
 }
