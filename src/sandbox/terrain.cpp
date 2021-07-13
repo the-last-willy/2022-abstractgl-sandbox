@@ -166,9 +166,7 @@ int throwing_main() {
             terrain_size * terrain_size,
             GL_MAP_WRITE_BIT);
 
-        auto mapping = reinterpret_cast<Vec2*>(
-            glMapNamedBuffer(terrain_coords, GL_WRITE_ONLY));
-        gl::throw_if_error();
+        auto mapping = gl::BufferMapping(terrain_coords, GL_WRITE_ONLY);
 
         for(int j = 0; j < terrain_size; ++j)
         for(int i = 0; i < terrain_size; ++i) {
@@ -176,8 +174,6 @@ int throwing_main() {
                 static_cast<float>(i),
                 static_cast<float>(j)};
         }
-
-        glUnmapNamedBuffer(terrain_coords);
     }
 
     auto terrain_elements = gl::Buffer<Vec3i>();
@@ -186,9 +182,7 @@ int throwing_main() {
             2 * (terrain_size - 1) * (terrain_size - 1), // Number of triangles.
             GL_MAP_WRITE_BIT);
 
-        auto mapping = reinterpret_cast<Vec3i*>(
-            glMapNamedBuffer(terrain_elements, GL_WRITE_ONLY));
-        gl::throw_if_error();
+        auto mapping = gl::BufferMapping(terrain_elements, GL_WRITE_ONLY);
 
         for(int j = 0; j < (terrain_size - 1); ++j)
         for(int i = 0; i < (terrain_size - 1); ++i) {
@@ -203,23 +197,19 @@ int throwing_main() {
                 (j + 0) * (terrain_size) + (i + 1),
                 (j + 1) * (terrain_size) + (i + 0)};
         }
-
-        glUnmapNamedBuffer(terrain_elements);
     }
 
     auto terrain_heights = gl::Buffer<GLfloat>(
         terrain_size * terrain_size,
         GL_MAP_WRITE_BIT);
     {
-        auto mapping = glMapNamedBuffer(terrain_heights, GL_WRITE_ONLY);
-        gl::throw_if_error();
+        auto mapping = gl::BufferMapping(terrain_heights, GL_WRITE_ONLY);
 
+        // Undefined behaviour.
         glGetTextureImage(
             height_texture, 0, GL_RED, GL_FLOAT, terrain_size * terrain_size * sizeof(float),
-            mapping);
+            mapping.data());
         gl::throw_if_error();
-
-        glUnmapNamedBuffer(terrain_heights);
     }
 
     auto terrain = gl::VertexArray();
