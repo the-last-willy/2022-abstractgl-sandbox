@@ -1,24 +1,28 @@
-#version 460 core
+// #version 460 core
 
-layout(triangles) in;
+// layout(triangles) in;
 
-layout(triangle_strip, max_vertices = 3) out;
+// layout(triangle_strip, max_vertices = 3) out;
 
-out vec3 vertex_normal;
+// in VS_OUT {
+//     vec3 vertex_normal;
+//     vec3 vertex_position;
+//     vec2 vertex_uv;
+// } gs_in[];
 
-void main() {
-    vertex_normal = normalize(cross(
-        gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz,
-        gl_in[2].gl_Position.xyz - gl_in[0].gl_Position.xyz));
+// out vec3 vertex_normal;
+// out vec2 vertex_uv;
 
-    gl_Position = gl_in[0].gl_Position;
-    EmitVertex();
+// void do_vertex(int i) {
+//     vertex_normal = gs_in[i].vertex_normal;
+//     vertex_uv = gs_in[i].vertex_uv;
+//     gl_Position = gl_in[i].gl_Position;
+//     EmitVertex();
+// }
 
-    gl_Position = gl_in[1].gl_Position;
-    EmitVertex();
-
-    gl_Position = gl_in[2].gl_Position;
-    EmitVertex();
-
-    EndPrimitive();
-}
+// void main() {
+//     do_vertex(0);
+//     do_vertex(1);
+//     do_vertex(2);
+//     EndPrimitive();
+// }

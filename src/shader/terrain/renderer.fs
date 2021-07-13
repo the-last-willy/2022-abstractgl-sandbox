@@ -1,12 +1,17 @@
 #version 460 core
 
+uniform vec3 light_direction;
+uniform sampler2D tex;
+
 in vec3 vertex_normal;
+in vec2 vertex_uv;
 
 out vec4 fragment_color;
 
 void main() {
-    vec3 light_direction = vec3(0.f, -1.f, 0.f);
-    float lambertian = abs(dot(vertex_normal, light_direction)); // TODO: fix later
-    float diffuse = lambertian;
-    fragment_color = vec4(vec3(diffuse), 1.f);
+    float lambertian = max(dot(vertex_normal, -light_direction), 0.f);
+    lambertian = lambertian / 2.f + 0.5f;
+    vec4 diffuse = lambertian * texture(tex, vertex_uv);
+    fragment_color = diffuse;
+    // fragment_color = vec4(vertex_uv, 0.5f, 1.f);
 }

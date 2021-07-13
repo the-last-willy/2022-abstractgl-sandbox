@@ -44,6 +44,8 @@ int throwing_main() {
     
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     
         window = glfwCreateWindow(1280, 720, "Procedural Terrain Generation", NULL, NULL);
         if (!window)
@@ -94,6 +96,15 @@ int throwing_main() {
         glEnableVertexArrayAttrib(quad, 0);
         gl::throw_if_error();
     }
+
+    auto color_texture = gl::Texture2();
+    {
+        glTextureStorage2D(color_texture, 1, GL_RGBA8, terrain_size, terrain_size);
+        gl::throw_if_error();
+        glTextureParameteri(color_texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTextureParameteri(color_texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        gl::throw_if_error();
+    }
     
     auto height_texture = gl::Texture2();
     {
@@ -104,12 +115,36 @@ int throwing_main() {
         gl::throw_if_error();
     }
 
+    auto normal_texture = gl::Texture2();
+    {
+        glTextureStorage2D(normal_texture, 1, GL_RGB32F, terrain_size, terrain_size);
+        gl::throw_if_error();
+        glTextureParameteri(normal_texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTextureParameteri(normal_texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        gl::throw_if_error();
+    }
+
     auto frame_buffer = gl::FrameBuffer();
     {
         glNamedFramebufferTexture(
-            frame_buffer, GL_COLOR_ATTACHMENT0, height_texture, 0);
+            frame_buffer, GL_COLOR_ATTACHMENT0, color_texture, 0);
+        gl::throw_if_error();
+        glNamedFramebufferTexture(
+            frame_buffer, GL_COLOR_ATTACHMENT1, height_texture, 0);
+        gl::throw_if_error();
+        glNamedFramebufferTexture(
+            frame_buffer, GL_COLOR_ATTACHMENT2, normal_texture, 0);
         gl::throw_if_error();
         gl::throw_if_incomplete(frame_buffer);
+
+        {
+            auto buffers = std::array<GLenum, 3>{
+                GL_COLOR_ATTACHMENT0,
+                GL_COLOR_ATTACHMENT1,
+                GL_COLOR_ATTACHMENT2};
+            glNamedFramebufferDrawBuffers(
+                frame_buffer, GLsizei(size(buffers)), data(buffers));
+        }
     }
 
     auto terrain_generator = gl::Program();
@@ -212,6 +247,33 @@ int throwing_main() {
         gl::throw_if_error();
     }
 
+    auto terrain_normals = gl::Buffer<Vec3>(
+        terrain_size * terrain_size,
+        GL_MAP_WRITE_BIT);
+    {
+        auto mapping = gl::BufferMapping(terrain_normals, GL_WRITE_ONLY);
+
+        // Undefined behaviour.
+        glGetTextureImage(
+            normal_texture, 0, GL_RGB, GL_FLOAT, terrain_size * terrain_size * sizeof(Vec3),
+            mapping.data());
+        gl::throw_if_error();
+    }
+
+    auto terrain_uvs = gl::Buffer<Vec2>(
+        terrain_size * terrain_size,
+        GL_MAP_WRITE_BIT);
+    {
+        auto mapping = gl::BufferMapping(terrain_uvs, GL_WRITE_ONLY);
+
+        for(int j = 0; j < terrain_size; ++j)
+        for(int i = 0; i < terrain_size; ++i) {
+            mapping[j * terrain_size + i] = Vec2{
+                float(i) / (terrain_size - 1),
+                float(j) / (terrain_size - 1)};
+        }
+    }
+
     auto terrain = gl::VertexArray();
     {
         {
@@ -252,6 +314,99 @@ int throwing_main() {
             glEnableVertexArrayAttrib(terrain, 1);
             gl::throw_if_error();
         }
+
+        {
+            glVertexArrayVertexBuffer( 
+                terrain, 2, terrain_normals, 0, sizeof(Vec3));
+            gl::throw_if_error();
+
+            glVertexArrayAttribBinding(
+                terrain, 2, 2);
+            gl::throw_if_error();
+
+            glVertexArrayAttribFormat(
+                terrain, 2, 3, GL_FLOAT, GL_FALSE, 0);
+            gl::throw_if_error();
+
+            glEnableVertexArrayAttrib(terrain, 2);
+            gl::throw_if_error();
+        }
+
+        {
+            glVertexArrayVertexBuffer( 
+                terrain, 3, terrain_uvs, 0, sizeof(Vec2));
+            gl::throw_if_error();
+
+            glVertexArrayAttribBinding(
+                terrain, 3, 3);
+            gl::throw_if_error();
+
+            glVertexArrayAttribFormat(
+                terrain, 3, 2, GL_FLOAT, GL_FALSE, 0);
+            gl::throw_if_error();
+
+            glEnableVertexArrayAttrib(terrain, 3);
+            gl::throw_if_error();
+        }
+    }
+
+    auto terrain_debug = gl::VertexArray();
+    {
+        {
+            gl::bind(terrain_debug);
+            gl::bind_to_element_array(terrain_elements);
+        }
+        
+        {
+            glVertexArrayVertexBuffer( 
+                terrain_debug, 0, terrain_coords, 0, sizeof(Vec2));
+            gl::throw_if_error();
+
+            glVertexArrayAttribBinding(
+                terrain_debug, 0, 0);
+            gl::throw_if_error();
+
+            glVertexArrayAttribFormat(
+                terrain_debug, 0, 2, GL_FLOAT, GL_FALSE, 0);
+            gl::throw_if_error();
+
+            glEnableVertexArrayAttrib(terrain_debug, 0);
+            gl::throw_if_error();
+        }
+
+        {
+            glVertexArrayVertexBuffer( 
+                terrain_debug, 1, terrain_heights, 0, sizeof(GLfloat));
+            gl::throw_if_error();
+
+            glVertexArrayAttribBinding(
+                terrain_debug, 1, 1);
+            gl::throw_if_error();
+
+            glVertexArrayAttribFormat(
+                terrain_debug, 1, 1, GL_FLOAT, GL_FALSE, 0);
+            gl::throw_if_error();
+
+            glEnableVertexArrayAttrib(terrain_debug, 1);
+            gl::throw_if_error();
+        }
+
+        {
+            glVertexArrayVertexBuffer( 
+                terrain_debug, 2, terrain_normals, 0, sizeof(Vec3));
+            gl::throw_if_error();
+
+            glVertexArrayAttribBinding(
+                terrain_debug, 2, 2);
+            gl::throw_if_error();
+
+            glVertexArrayAttribFormat(
+                terrain_debug, 2, 3, GL_FLOAT, GL_FALSE, 0);
+            gl::throw_if_error();
+
+            glEnableVertexArrayAttrib(terrain_debug, 2);
+            gl::throw_if_error();
+        }
     }
 
     auto terrain_renderer = gl::Program();
@@ -267,19 +422,6 @@ int throwing_main() {
                 throw gl::CompilationFailure();
             }
             gl::attach(terrain_renderer, vs);
-        }
-
-        auto gs = gl::GeometryShader();
-        {
-            gl::source(gs, file(root + "src/shader/terrain/renderer.gs"));
-            auto success = gl::try_compile(gs);
-            if(success) {
-                std::cout << "-- Geometry shader compilation succeeded." << std::endl;
-            } else {
-                std::cerr << info_log(gs) << std::endl;
-                throw gl::CompilationFailure();
-            }
-            gl::attach(terrain_renderer, gs);
         }
 
         auto fs = gl::FragmentShader();
@@ -305,6 +447,62 @@ int throwing_main() {
             }
         }
     }
+
+    auto normal_renderer = gl::Program();
+    {
+        auto vs = gl::VertexShader();
+        {
+            gl::source(vs, file(root + "src/shader/debug/normal_lines.vs"));
+            auto success = gl::try_compile(vs);
+            if(success) {
+                std::cout << "-- Vertex shader compilation succeeded." << std::endl;
+            } else {
+                std::cerr << info_log(vs) << std::endl;
+                throw gl::CompilationFailure();
+            }
+            gl::attach(normal_renderer, vs);
+        }
+
+        auto gs = gl::GeometryShader();
+        {
+            gl::source(gs, file(root + "src/shader/debug/normal_lines.gs"));
+            auto success = gl::try_compile(gs);
+            if(success) {
+                std::cout << "-- Geometry shader compilation succeeded." << std::endl;
+            } else {
+                std::cerr << info_log(gs) << std::endl;
+                throw gl::CompilationFailure();
+            }
+            gl::attach(normal_renderer, gs);
+        }
+
+        auto fs = gl::FragmentShader();
+        {
+            gl::source(fs, file(root + "src/shader/debug/normal_lines.fs"));
+            auto success = gl::try_compile(fs);
+            if(success) {
+                std::cout << "-- Fragment shader compilation succeeded." << std::endl;
+            } else {
+                std::cerr << info_log(fs) << std::endl;
+                throw gl::CompilationFailure();
+            }
+            gl::attach(normal_renderer, fs);
+        }
+
+        {
+            auto success = gl::try_link(normal_renderer);
+            if(success) {
+                std::cout << "-- Program linkage succeeded." << std::endl;
+            } else {
+                std::cerr << gl::info_log(normal_renderer) << std::endl;
+                throw gl::LinkageFailure();
+            }
+        }
+    }
+
+    glActiveTexture(GL_TEXTURE0);
+    gl::bind(color_texture);
+
     auto camera = scene::Camera();
     camera.pitch = 0.5f; 
     camera.position = Vec3{0.f, 100.f, 0.f};
@@ -346,17 +544,44 @@ int throwing_main() {
             auto v = transformation(camera);
             auto p = perspective(camera);
 
-            auto mvp = p * v;
+            auto mv = v;
+            auto mvp = p * mv;
 
             gl::use(terrain_renderer);
+
+            gl::try_uniform(
+                    terrain_renderer, "light_direction",
+                    normalized(Vec3{-1.f, -1.f, 0.f}));
+
+            gl::try_uniform(
+                    terrain_renderer, "mv", mv);
+
             gl::try_uniform(
                     terrain_renderer, "mvp", mvp);
+
+            glUniform1i(
+                    gl::uniform_location(terrain_renderer, "tex"),
+                    0);
             
             gl::bind(terrain);
             gl::draw_elements(
                 GL_TRIANGLES,
                 2 * 3 * (terrain_size - 1) * (terrain_size - 1),
                 GL_UNSIGNED_INT, 0);
+
+            // {
+            //     glUseProgram(normal_renderer);
+            //     gl::bind(terrain_debug);
+
+            //     gl::try_uniform(
+            //         normal_renderer, "mvp", mvp);
+
+            //     gl::bind(terrain);
+            //     gl::draw_elements(
+            //         GL_TRIANGLES,
+            //         2 * 3 * (terrain_size - 1) * (terrain_size - 1),
+            //         GL_UNSIGNED_INT, 0);
+            // }
         }
 
         glfwSwapBuffers(window);
