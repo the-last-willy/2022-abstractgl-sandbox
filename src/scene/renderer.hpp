@@ -1,51 +1,51 @@
-#pragma once
+// #pragma once
 
-#include "node.hpp"
+// #include "node.hpp"
 
-#include "matrix/all.hpp"
+// #include "matrix/all.hpp"
 
-#include <vector>
+// #include <vector>
 
-namespace tlw {
-namespace scene {
+// namespace tlw {
+// namespace scene {
 
-struct Renderer {
+// struct Renderer {
 
-    void visit(const Group<Renderer>& g) {
-        for(auto& c : g.children) {
-            c->accept(*this);
-        }
-    }
+//     void visit(const Group<Renderer>& g) {
+//         for(auto& c : g.children) {
+//             c->accept(*this);
+//         }
+//     }
 
-    void visit(const Instance<Renderer>& i) {
-        auto& mat = i.material;
-        auto& program = *(this->program);
+//     void visit(const Instance<Renderer>& i) {
+//         auto& mat = i.material;
+//         auto& prog = *(program);
         
-        gl::try_uniform(program, "material.ambient",
-            Vec3{mat.ambient[0], mat.ambient[1], mat.ambient[2]});
-        gl::try_uniform(program, "material.diffuse",
-            Vec3{mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]});
-        gl::try_uniform(program, "material.shininess",
-            mat.shininess);
-        gl::try_uniform(program, "material.specular",
-            Vec3{mat.specular[0], mat.specular[1], mat.specular[2]});
-        gl::try_uniform(program, "m", models.back());
-        gl::try_uniform(program, "mvp", projection * view * models.back());
-        gl::bind(i.vertex_array);
-        gl::draw_arrays(GL_TRIANGLES, 0, i.vertex_count);
-    }
+//         gl::try_uniform(prog, "material.ambient",
+//             Vec3{mat.ambient[0], mat.ambient[1], mat.ambient[2]});
+//         gl::try_uniform(prog, "material.diffuse",
+//             Vec3{mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]});
+//         gl::try_uniform(prog, "material.shininess",
+//             mat.shininess);
+//         gl::try_uniform(prog, "material.specular",
+//             Vec3{mat.specular[0], mat.specular[1], mat.specular[2]});
+//         gl::try_uniform(prog, "m", models.back());
+//         gl::try_uniform(prog, "mvp", projection * view * models.back());
+//         gl::bind(i.vertex_array);
+//         gl::draw_arrays(GL_TRIANGLES, 0, i.vertex_count);
+//     }
 
-    void visit(const Transformation<Renderer>& t) {
-        models.push_back(models.back() * t.mat);
-        t.child->accept(*this);
-        models.pop_back();
-    }
+//     void visit(const Transformation<Renderer>& t) {
+//         models.push_back(models.back() * t.mat);
+//         t.child->accept(*this);
+//         models.pop_back();
+//     }
 
-    gl::Program* program = nullptr;
+//     gl::Program* program = nullptr;
 
-    Mat4 projection = mat4_identity();
-    Mat4 view = mat4_identity();
-    std::vector<Mat4> models = {mat4_identity()};
-};
+//     Mat4 projection = mat4_identity();
+//     Mat4 view = mat4_identity();
+//     std::vector<Mat4> models = {mat4_identity()};
+// };
 
-}}
+// }}

@@ -15,6 +15,7 @@
 #include <GLFW/glfw3.h>
 
 #include <iostream>
+#include <span>
 #include <vector>
 
 using namespace tlw;
@@ -60,16 +61,20 @@ int throwing_main() {
             printf("Failed to initialize OpenGL context");
             return -1;
         }
+
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        glDebugMessageCallback(&gl::error_callback, NULL);
+        gl::throw_if_error();
     }
 
     auto terrain_size = 2048;
 
-    auto quad_positions = gl::Buffer();
+    auto quad_positions = gl::Buffer<Vec2>();
     {
-        auto vertices = std::array{
+        auto positions = std::array{
             Vec2{-1.f, -1.f}, Vec2{ 1.f, -1.f}, Vec2{-1.f,  1.f},
             Vec2{ 1.f,  1.f}, Vec2{-1.f,  1.f}, Vec2{ 1.f, -1.f}};
-        gl::storage(quad_positions, std::span(vertices));
+        quad_positions = gl::Buffer(std::span(positions));
     }
 
     auto quad = gl::VertexArray();
@@ -155,12 +160,11 @@ int throwing_main() {
         gl::throw_if_error();
     }
 
-    auto terrain_coords = gl::Buffer();
+    auto terrain_coords = gl::Buffer<Vec2>();
     {
-        glNamedBufferStorage(
-            terrain_coords, terrain_size * terrain_size * sizeof(Vec2), NULL, 
+        terrain_coords = gl::Buffer<Vec2>(
+            terrain_size * terrain_size,
             GL_MAP_WRITE_BIT);
-        gl::throw_if_error();
 
         auto mapping = reinterpret_cast<Vec2*>(
             glMapNamedBuffer(terrain_coords, GL_WRITE_ONLY));
@@ -176,12 +180,11 @@ int throwing_main() {
         glUnmapNamedBuffer(terrain_coords);
     }
 
-    auto terrain_elements = gl::Buffer();
+    auto terrain_elements = gl::Buffer<Vec3i>();
     {
-        glNamedBufferStorage(
-            terrain_elements, 2 * (terrain_size - 1) * (terrain_size - 1) * sizeof(Vec3i), NULL, 
+        terrain_elements = gl::Buffer<Vec3i>(
+            2 * (terrain_size - 1) * (terrain_size - 1), // Number of triangles.
             GL_MAP_WRITE_BIT);
-        gl::throw_if_error();
 
         auto mapping = reinterpret_cast<Vec3i*>(
             glMapNamedBuffer(terrain_elements, GL_WRITE_ONLY));
@@ -204,13 +207,10 @@ int throwing_main() {
         glUnmapNamedBuffer(terrain_elements);
     }
 
-    auto terrain_heights = gl::Buffer();
+    auto terrain_heights = gl::Buffer<GLfloat>(
+        terrain_size * terrain_size,
+        GL_MAP_WRITE_BIT);
     {
-        glNamedBufferStorage(
-            terrain_heights, terrain_size * terrain_size * sizeof(GLfloat), NULL, 
-            GL_MAP_WRITE_BIT);
-        gl::throw_if_error();
-
         auto mapping = glMapNamedBuffer(terrain_heights, GL_WRITE_ONLY);
         gl::throw_if_error();
 
