@@ -9,7 +9,8 @@ namespace gl {
 
 template<typename Traits>
 auto stride(const Buffer<Traits>&) {
-    return Stride(sizeof(Buffer<Traits>::value_type));
+    return Stride<GLsizei>(
+        sizeof(Buffer<Traits>::value_type));
 }
 
 }}
