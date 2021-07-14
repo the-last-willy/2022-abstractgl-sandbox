@@ -409,96 +409,31 @@ int throwing_main() {
         }
     }
 
-    auto terrain_renderer = gl::Program();
-    {
-        auto vs = gl::VertexShader();
+    auto terrain_renderer = gl::program({
         {
-            gl::source(vs, file(root + "src/shader/terrain/renderer.vs"));
-            auto success = gl::try_compile(vs);
-            if(success) {
-                std::cout << "-- Vertex shader compilation succeeded." << std::endl;
-            } else {
-                std::cerr << info_log(vs) << std::endl;
-                throw gl::CompilationFailure();
-            }
-            gl::attach(terrain_renderer, vs);
+            GL_VERTEX_SHADER,
+            file(root + "src/shader/terrain/renderer.vs").c_str()
+        },
+        {
+            GL_FRAGMENT_SHADER,
+            file(root + "src/shader/terrain/renderer.fs").c_str()
         }
+    });
 
-        auto fs = gl::FragmentShader();
+    auto normal_renderer = gl::program({
         {
-            gl::source(fs, file(root + "src/shader/terrain/renderer.fs"));
-            auto success = gl::try_compile(fs);
-            if(success) {
-                std::cout << "-- Fragment shader compilation succeeded." << std::endl;
-            } else {
-                std::cerr << info_log(fs) << std::endl;
-                throw gl::CompilationFailure();
-            }
-            gl::attach(terrain_renderer, fs);
-        }
-
+            GL_VERTEX_SHADER,
+            file(root + "src/shader/debug/normal_lines.vs").c_str()
+        },
         {
-            auto success = gl::try_link(terrain_renderer);
-            if(success) {
-                std::cout << "-- Program linkage succeeded." << std::endl;
-            } else {
-                std::cerr << gl::info_log(terrain_generator) << std::endl;
-                throw gl::LinkageFailure();
-            }
-        }
-    }
-
-    auto normal_renderer = gl::Program();
-    {
-        auto vs = gl::VertexShader();
+            GL_GEOMETRY_SHADER,
+            file(root + "src/shader/debug/normal_lines.gs").c_str()
+        },
         {
-            gl::source(vs, file(root + "src/shader/debug/normal_lines.vs"));
-            auto success = gl::try_compile(vs);
-            if(success) {
-                std::cout << "-- Vertex shader compilation succeeded." << std::endl;
-            } else {
-                std::cerr << info_log(vs) << std::endl;
-                throw gl::CompilationFailure();
-            }
-            gl::attach(normal_renderer, vs);
+            GL_FRAGMENT_SHADER,
+            file(root + "src/shader/debug/normal_lines.fs").c_str()
         }
-
-        auto gs = gl::GeometryShader();
-        {
-            gl::source(gs, file(root + "src/shader/debug/normal_lines.gs"));
-            auto success = gl::try_compile(gs);
-            if(success) {
-                std::cout << "-- Geometry shader compilation succeeded." << std::endl;
-            } else {
-                std::cerr << info_log(gs) << std::endl;
-                throw gl::CompilationFailure();
-            }
-            gl::attach(normal_renderer, gs);
-        }
-
-        auto fs = gl::FragmentShader();
-        {
-            gl::source(fs, file(root + "src/shader/debug/normal_lines.fs"));
-            auto success = gl::try_compile(fs);
-            if(success) {
-                std::cout << "-- Fragment shader compilation succeeded." << std::endl;
-            } else {
-                std::cerr << info_log(fs) << std::endl;
-                throw gl::CompilationFailure();
-            }
-            gl::attach(normal_renderer, fs);
-        }
-
-        {
-            auto success = gl::try_link(normal_renderer);
-            if(success) {
-                std::cout << "-- Program linkage succeeded." << std::endl;
-            } else {
-                std::cerr << gl::info_log(normal_renderer) << std::endl;
-                throw gl::LinkageFailure();
-            }
-        }
-    }
+    });
 
     glActiveTexture(GL_TEXTURE0);
     gl::bind(color_texture);
@@ -569,19 +504,19 @@ int throwing_main() {
                 2 * 3 * (terrain_size - 1) * (terrain_size - 1),
                 GL_UNSIGNED_INT, 0);
 
-            // {
-            //     glUseProgram(normal_renderer);
-            //     gl::bind(terrain_debug);
+            {
+                glUseProgram(normal_renderer);
+                gl::bind(terrain_debug);
 
-            //     gl::try_uniform(
-            //         normal_renderer, "mvp", mvp);
+                gl::try_uniform(
+                    normal_renderer, "mvp", mvp);
 
-            //     gl::bind(terrain);
-            //     gl::draw_elements(
-            //         GL_TRIANGLES,
-            //         2 * 3 * (terrain_size - 1) * (terrain_size - 1),
-            //         GL_UNSIGNED_INT, 0);
-            // }
+                gl::bind(terrain);
+                gl::draw_elements(
+                    GL_TRIANGLES,
+                    2 * 3 * (terrain_size - 1) * (terrain_size - 1),
+                    GL_UNSIGNED_INT, 0);
+            }
         }
 
         glfwSwapBuffers(window);
