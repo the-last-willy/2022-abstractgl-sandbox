@@ -18,5 +18,5 @@ void main() {
     vertex_uv = uv;
 
     gl_Position = mvp * position;
-    gl_Position.z = -1.f;
+    // gl_Position.z = -1.f;
 }
