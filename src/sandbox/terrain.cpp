@@ -79,22 +79,29 @@ int throwing_main() {
         quad_positions = gl::Buffer(std::span(positions));
     }
 
+    auto terrain_generator = gl::program({
+        {
+            GL_VERTEX_SHADER,
+            file(root + "src/shader/terrain/generator.vs").c_str()
+        },
+        {
+            GL_FRAGMENT_SHADER,
+            file(root + "src/shader/terrain/generator.fs").c_str()
+        }
+    });
+
     auto quad = gl::VertexArray();
     {
         glVertexArrayVertexBuffer( 
-            quad, 0, quad_positions, 0, sizeof(Vec2));
-        gl::throw_if_error();
-
-        glVertexArrayAttribBinding(
-            quad, 0, 0);
-        gl::throw_if_error();
-
+            quad, 0, quad_positions, 0, stride(quad_positions));
         glVertexArrayAttribFormat(
             quad, 0, 2, GL_FLOAT, GL_FALSE, 0);
-        gl::throw_if_error();
 
-        glEnableVertexArrayAttrib(quad, 0);
-        gl::throw_if_error();
+        {
+            auto l = gl::AttributeLocation(terrain_generator, "position");
+            glVertexArrayAttribBinding(quad, l, 0);
+            glEnableVertexArrayAttrib(quad, l);
+        }
     }
 
     auto color_texture = gl::Texture2();
@@ -146,17 +153,6 @@ int throwing_main() {
                 frame_buffer, GLsizei(size(buffers)), data(buffers));
         }
     }
-
-    auto terrain_generator = gl::program({
-        {
-            GL_VERTEX_SHADER,
-            file(root + "src/shader/terrain/generator.vs").c_str()
-        },
-        {
-            GL_FRAGMENT_SHADER,
-            file(root + "src/shader/terrain/generator.fs").c_str()
-        }
-    });
 
     {
         glViewport(0, 0, terrain_size, terrain_size);
@@ -246,141 +242,6 @@ int throwing_main() {
         }
     }
 
-    auto terrain = gl::VertexArray();
-    {
-        {
-            gl::bind(terrain);
-            gl::bind_to_element_array(terrain_elements);
-        }
-        
-        {
-            glVertexArrayVertexBuffer( 
-                terrain, 0, terrain_coords, 0, sizeof(Vec2));
-            gl::throw_if_error();
-
-            glVertexArrayAttribBinding(
-                terrain, 0, 0);
-            gl::throw_if_error();
-
-            glVertexArrayAttribFormat(
-                terrain, 0, 2, GL_FLOAT, GL_FALSE, 0);
-            gl::throw_if_error();
-
-            glEnableVertexArrayAttrib(terrain, 0);
-            gl::throw_if_error();
-        }
-
-        {
-            glVertexArrayVertexBuffer( 
-                terrain, 1, terrain_heights, 0, sizeof(GLfloat));
-            gl::throw_if_error();
-
-            glVertexArrayAttribBinding(
-                terrain, 1, 1);
-            gl::throw_if_error();
-
-            glVertexArrayAttribFormat(
-                terrain, 1, 1, GL_FLOAT, GL_FALSE, 0);
-            gl::throw_if_error();
-
-            glEnableVertexArrayAttrib(terrain, 1);
-            gl::throw_if_error();
-        }
-
-        {
-            glVertexArrayVertexBuffer( 
-                terrain, 2, terrain_normals, 0, sizeof(Vec3));
-            gl::throw_if_error();
-
-            glVertexArrayAttribBinding(
-                terrain, 2, 2);
-            gl::throw_if_error();
-
-            glVertexArrayAttribFormat(
-                terrain, 2, 3, GL_FLOAT, GL_FALSE, 0);
-            gl::throw_if_error();
-
-            glEnableVertexArrayAttrib(terrain, 2);
-            gl::throw_if_error();
-        }
-
-        {
-            glVertexArrayVertexBuffer( 
-                terrain, 3, terrain_uvs, 0, sizeof(Vec2));
-            gl::throw_if_error();
-
-            glVertexArrayAttribBinding(
-                terrain, 3, 3);
-            gl::throw_if_error();
-
-            glVertexArrayAttribFormat(
-                terrain, 3, 2, GL_FLOAT, GL_FALSE, 0);
-            gl::throw_if_error();
-
-            glEnableVertexArrayAttrib(terrain, 3);
-            gl::throw_if_error();
-        }
-    }
-
-    auto terrain_debug = gl::VertexArray();
-    {
-        {
-            gl::bind(terrain_debug);
-            gl::bind_to_element_array(terrain_elements);
-        }
-        
-        {
-            glVertexArrayVertexBuffer( 
-                terrain_debug, 0, terrain_coords, 0, sizeof(Vec2));
-            gl::throw_if_error();
-
-            glVertexArrayAttribBinding(
-                terrain_debug, 0, 0);
-            gl::throw_if_error();
-
-            glVertexArrayAttribFormat(
-                terrain_debug, 0, 2, GL_FLOAT, GL_FALSE, 0);
-            gl::throw_if_error();
-
-            glEnableVertexArrayAttrib(terrain_debug, 0);
-            gl::throw_if_error();
-        }
-
-        {
-            glVertexArrayVertexBuffer( 
-                terrain_debug, 1, terrain_heights, 0, sizeof(GLfloat));
-            gl::throw_if_error();
-
-            glVertexArrayAttribBinding(
-                terrain_debug, 1, 1);
-            gl::throw_if_error();
-
-            glVertexArrayAttribFormat(
-                terrain_debug, 1, 1, GL_FLOAT, GL_FALSE, 0);
-            gl::throw_if_error();
-
-            glEnableVertexArrayAttrib(terrain_debug, 1);
-            gl::throw_if_error();
-        }
-
-        {
-            glVertexArrayVertexBuffer( 
-                terrain_debug, 2, terrain_normals, 0, sizeof(Vec3));
-            gl::throw_if_error();
-
-            glVertexArrayAttribBinding(
-                terrain_debug, 2, 2);
-            gl::throw_if_error();
-
-            glVertexArrayAttribFormat(
-                terrain_debug, 2, 3, GL_FLOAT, GL_FALSE, 0);
-            gl::throw_if_error();
-
-            glEnableVertexArrayAttrib(terrain_debug, 2);
-            gl::throw_if_error();
-        }
-    }
-
     auto terrain_renderer = gl::program({
         {
             GL_VERTEX_SHADER,
@@ -391,6 +252,67 @@ int throwing_main() {
             file(root + "src/shader/terrain/renderer.fs").c_str()
         }
     });
+
+    auto terrain = gl::VertexArray();
+    {
+        {
+            gl::bind(terrain);
+            gl::bind_to_element_array(terrain_elements);
+        }
+        
+        {
+            glVertexArrayVertexBuffer( 
+                terrain, 0, terrain_coords, 0, stride(terrain_coords));
+            glVertexArrayAttribFormat(
+                terrain, 0, 2, GL_FLOAT, GL_FALSE, 0);
+
+            {
+                auto l = gl::AttributeLocation(terrain_renderer, "coords");
+                glVertexArrayAttribBinding(terrain, l, 0);
+                glEnableVertexArrayAttrib(terrain, l);
+            }
+        }
+
+        {
+            glVertexArrayVertexBuffer( 
+                terrain, 1, terrain_heights, 0, stride(terrain_heights));
+            glVertexArrayAttribFormat(
+                terrain, 1, 1, GL_FLOAT, GL_FALSE, 0);
+
+            {
+                auto l = gl::AttributeLocation(terrain_renderer, "height");
+                glVertexArrayAttribBinding(terrain, l, 1);
+                glEnableVertexArrayAttrib(terrain, l);
+            }
+        }
+
+        {
+            glVertexArrayVertexBuffer( 
+                terrain, 2, terrain_normals, 0, stride(terrain_normals));
+            glVertexArrayAttribFormat(
+                terrain, 2, 3, GL_FLOAT, GL_FALSE, 0);
+
+            {
+                auto l = gl::AttributeLocation(terrain_renderer, "normal");
+                glVertexArrayAttribBinding(terrain, l, 2);
+                glEnableVertexArrayAttrib(terrain, l);
+            }
+        }
+
+        {
+            glVertexArrayVertexBuffer( 
+                terrain, 3, terrain_uvs, 0, stride(terrain_uvs));
+            glVertexArrayAttribFormat(
+                terrain, 3, 2, GL_FLOAT, GL_FALSE, 0);
+
+            {
+                auto l = gl::AttributeLocation(terrain_renderer, "uv");
+                glVertexArrayAttribBinding(
+                    terrain, l, 3);
+                glEnableVertexArrayAttrib(terrain, l);
+            }
+        }
+    }
 
     auto normal_renderer = gl::program({
         {
@@ -406,6 +328,53 @@ int throwing_main() {
             file(root + "src/shader/debug/normal_lines.fs").c_str()
         }
     });
+
+    auto terrain_debug = gl::VertexArray();
+    {
+        {
+            gl::bind(terrain_debug);
+            gl::bind_to_element_array(terrain_elements);
+        }
+        
+        {
+            glVertexArrayVertexBuffer( 
+                terrain_debug, 0, terrain_coords, 0, stride(terrain_coords));
+            glVertexArrayAttribFormat(
+                terrain_debug, 0, 2, GL_FLOAT, GL_FALSE, 0);
+
+            {
+                auto l = gl::AttributeLocation(normal_renderer, "coords");
+                glVertexArrayAttribBinding(terrain_debug, l, 0);
+                glEnableVertexArrayAttrib(terrain_debug, l);
+            }
+        }
+
+        {
+            glVertexArrayVertexBuffer( 
+                terrain_debug, 1, terrain_heights, 0, sizeof(GLfloat));
+            glVertexArrayAttribFormat(
+                terrain_debug, 1, 1, GL_FLOAT, GL_FALSE, 0);
+
+            {
+                auto l = gl::AttributeLocation(normal_renderer, "height");
+                glVertexArrayAttribBinding(terrain_debug, l, 1);
+                glEnableVertexArrayAttrib(terrain_debug, l);
+            } 
+        }
+
+        {
+            glVertexArrayVertexBuffer( 
+                terrain_debug, 2, terrain_normals, 0, stride(terrain_normals));
+            glVertexArrayAttribFormat(
+                terrain_debug, 2, 3, GL_FLOAT, GL_FALSE, 0);
+
+            {
+                auto l = gl::AttributeLocation(normal_renderer, "normal");
+                glVertexArrayAttribBinding(terrain_debug, l, 2);
+                glEnableVertexArrayAttrib(terrain_debug, l);
+            }
+        }
+    }
 
     glActiveTexture(GL_TEXTURE0);
     gl::bind(color_texture);
