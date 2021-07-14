@@ -9,5 +9,6 @@
 #include "texture/all.hpp"
 #include "uniform/all.hpp"
 #include "vertex_array/all.hpp"
+#include "attribute_location.hpp"
 #include "draw.hpp"
 #include "stride.hpp"
