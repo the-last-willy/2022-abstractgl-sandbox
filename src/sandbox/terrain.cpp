@@ -69,7 +69,7 @@ int throwing_main() {
         gl::throw_if_error();
     }
 
-    auto terrain_size = 2048;
+    auto terrain_size = 1 << (9 - 1);
 
     auto quad_positions = gl::Buffer<Vec2>();
     {
@@ -147,44 +147,16 @@ int throwing_main() {
         }
     }
 
-    auto terrain_generator = gl::Program();
-    {
-        auto vs = gl::VertexShader();
+    auto terrain_generator = gl::program({
         {
-            gl::source(vs, file(root + "src/shader/terrain/generator.vs"));
-            auto success = gl::try_compile(vs);
-            if(success) {
-                std::cout << "-- Vertex shader compilation succeeded." << std::endl;
-            } else {
-                std::cerr << info_log(vs) << std::endl;
-                throw gl::CompilationFailure();
-            }
-            gl::attach(terrain_generator, vs);
-        }
-
-        auto fs = gl::FragmentShader();
+            GL_VERTEX_SHADER,
+            file(root + "src/shader/terrain/generator.vs").c_str()
+        },
         {
-            gl::source(fs, file(root + "src/shader/terrain/generator.fs"));
-            auto success = gl::try_compile(fs);
-            if(success) {
-                std::cout << "-- Fragment shader compilation succeeded." << std::endl;
-            } else {
-                std::cerr << info_log(fs) << std::endl;
-                throw gl::CompilationFailure();
-            }
-            gl::attach(terrain_generator, fs);
+            GL_FRAGMENT_SHADER,
+            file(root + "src/shader/terrain/generator.fs").c_str()
         }
-
-        {
-            auto success = gl::try_link(terrain_generator);
-            if(success) {
-                std::cout << "-- Program linkage succeeded." << std::endl;
-            } else {
-                std::cerr << gl::info_log(terrain_generator) << std::endl;
-                throw gl::LinkageFailure();
-            }
-        }
-    }
+    });
 
     {
         glViewport(0, 0, terrain_size, terrain_size);
