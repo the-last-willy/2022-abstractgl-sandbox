@@ -13,6 +13,8 @@ namespace gl {
 template<typename Type>
 class Buffer {
 public:
+    using value_type = Type;
+
     Buffer() noexcept {}
 
     Buffer(GLsizei size, GLbitfield flags = 0) {
