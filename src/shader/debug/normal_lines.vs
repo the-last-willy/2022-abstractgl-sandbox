@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform float length = 10.f;
+uniform float length = 1.f;
 uniform mat4 mvp;
 
 layout(location = 0) in vec2 coords;
