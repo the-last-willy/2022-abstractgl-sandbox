@@ -10,3 +10,4 @@
 #include "uniform/all.hpp"
 #include "vertex_array/all.hpp"
 #include "draw.hpp"
+#include "stride.hpp"
