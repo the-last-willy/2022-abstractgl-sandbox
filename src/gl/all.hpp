@@ -12,3 +12,4 @@
 #include "attribute_location.hpp"
 #include "draw.hpp"
 #include "stride.hpp"
+#include "uniform.hpp"

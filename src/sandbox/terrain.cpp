@@ -423,36 +423,27 @@ int throwing_main() {
             auto mv = v;
             auto mvp = p * mv;
 
-            gl::use(terrain_renderer);
-
-            gl::try_uniform(
-                    terrain_renderer, "light_direction",
-                    normalized(Vec3{-1.f, -1.f, 0.f}));
-
-            gl::try_uniform(
-                    terrain_renderer, "mv", mv);
-
-            gl::try_uniform(
-                    terrain_renderer, "mvp", mvp);
-
-            glUniform1i(
-                    gl::uniform_location(terrain_renderer, "tex"),
-                    0);
-            
-            gl::bind(terrain);
-            gl::draw_elements(
-                GL_TRIANGLES,
-                2 * 3 * (terrain_size - 1) * (terrain_size - 1),
-                GL_UNSIGNED_INT, 0);
-
             {
-                glUseProgram(normal_renderer);
+                gl::use(terrain_renderer);
+                gl::bind(terrain);
+
+                gl::Uniform(terrain_renderer, "light_direction")
+                    = normalized(Vec3{-1.f, -1.f, 0.f});
+                gl::Uniform(terrain_renderer, "mv") = mv;
+                gl::Uniform(terrain_renderer, "mvp") = mvp;
+                gl::Uniform(terrain_renderer, "tex") = 0;
+                
+                gl::draw_elements(
+                    GL_TRIANGLES,
+                    2 * 3 * (terrain_size - 1) * (terrain_size - 1),
+                    GL_UNSIGNED_INT, 0);
+            }
+            {
+                gl::use(normal_renderer);
                 gl::bind(terrain_debug);
 
-                gl::try_uniform(
-                    normal_renderer, "mvp", mvp);
+                gl::Uniform(normal_renderer, "mvp") = mvp;
 
-                gl::bind(terrain);
                 gl::draw_elements(
                     GL_TRIANGLES,
                     2 * 3 * (terrain_size - 1) * (terrain_size - 1),
