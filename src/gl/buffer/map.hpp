@@ -13,7 +13,7 @@ public:
         , data_(static_cast<Type*>(glMapNamedBuffer(b, access)))
     {}
 
-    ~BufferMapping() {
+    ~BufferMapping() noexcept {
         glUnmapNamedBuffer(buffer);
     }
 
