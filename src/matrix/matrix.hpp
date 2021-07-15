@@ -42,6 +42,16 @@ public:
     }
 
     constexpr
+    auto& operator()(std::size_t col, std::size_t row) const {
+        return at(col, row);
+    }
+
+    constexpr
+    auto& operator()(std::size_t col, std::size_t row) {
+        return at(col, row);
+    }
+
+    constexpr
     auto column_count() const {
         return ColumnCount;
     }

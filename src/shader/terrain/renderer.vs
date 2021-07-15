@@ -1,6 +1,5 @@
 #version 460 core
 
-uniform mat4 mv;
 uniform mat4 mvp;
 
 layout(location = 0) in vec2 coords;

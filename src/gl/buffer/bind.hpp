@@ -5,6 +5,21 @@
 namespace tlw {
 namespace gl {
 
+template<typename BTraits>
+struct ScopedBufferBinding {
+    ScopedBufferBinding(GLenum target, const Buffer<BTraits>& b)
+        : target(target)
+    {
+        glBindBuffer(target, b);
+    }
+
+    ~ScopedBufferBinding() {
+        glBindBuffer(target, 0);
+    }
+
+    const GLenum target;
+};
+
 template<typename Traits>
 void bind_to_array(const Buffer<Traits>& b) {
     glBindBuffer(GL_ARRAY_BUFFER, b);

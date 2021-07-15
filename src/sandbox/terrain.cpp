@@ -14,11 +14,63 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <span>
 #include <vector>
 
 using namespace tlw;
+
+struct PerspectiveProjection {
+    float aspect_ratio = 16.f / 9.f;
+
+    float near = 0.1f;
+    float far = 1000.f;
+};
+
+constexpr
+auto transform(const PerspectiveProjection& p) {
+    // View space -> Clip space
+    // (near, far) -> (-near, far) 
+
+    // | 1 | 0 | 0 | 0 | = x
+    // | 0 | 1 | 0 | 0 | = y
+    // | 0 | 0 | a | b | -> (-near, far)
+    // | 0 | 0 | 1 | 0 | = z
+    
+    auto a = (p.far + p.near) / (p.far - p.near);
+    auto b = -2 * p.far * p.near / (p.far - p.near);
+
+    auto y = p.aspect_ratio;
+    return Mat4{ // A line is a column.
+        1.f, 0.f,  0.f, 0.f, 
+        0.f,   y,  0.f, 0.f,
+        0.f, 0.f,    a, 1.f,
+        0.f, 0.f,    b, 0.f};
+}
+
+struct View {
+    Vec3 position = Vec3{1024.f, 0.f, 1024.f};
+
+    // Aircraft rotation.
+    float yaw = 0.f;
+    float pitch = 0.f;
+};
+
+constexpr
+auto transform(const View& v) {
+    return translation(v.position)
+        * rotation_y(v.yaw)
+        * rotation_x(v.pitch);
+}
+
+Vec2 previous_cursor_pos;
+Vec2 current_cursor_pos;
+
+static void cursor_position_callback(GLFWwindow*, double x, double y) {
+    current_cursor_pos = {float(x), float(y)};
+}
 
 static void error_callback(int error, const char* description)
 {
@@ -35,6 +87,8 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 }
 
 int throwing_main() {
+    std::srand(std::time(0));
+
     GLFWwindow* window;
     {
         glfwSetErrorCallback(error_callback);
@@ -53,8 +107,16 @@ int throwing_main() {
             glfwTerminate();
             exit(EXIT_FAILURE);
         }
-    
+
+        glfwSetCursorPosCallback(window, cursor_position_callback);
         glfwSetKeyCallback(window, key_callback);
+
+        {
+            double x, y;
+            glfwGetCursorPos(window, &x, &y);
+            previous_cursor_pos = {float(x), float(y)};
+            current_cursor_pos = {float(x), float(y)};
+        }
     
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1);
@@ -69,7 +131,7 @@ int throwing_main() {
         gl::throw_if_error();
     }
 
-    auto terrain_size = 1 << (9 - 1);
+    auto terrain_size = 1 << (12 - 1);
 
     auto quad_positions = gl::Buffer<Vec2>();
     {
@@ -202,31 +264,27 @@ int throwing_main() {
         }
     }
 
-    auto terrain_heights = gl::Buffer<GLfloat>(
-        terrain_size * terrain_size,
-        GL_MAP_WRITE_BIT);
+    auto actual_terrain_heights = std::vector<GLfloat>(
+        terrain_size * terrain_size);
+    
     {
-        auto mapping = gl::BufferMapping(terrain_heights, GL_WRITE_ONLY);
-
-        // Undefined behaviour.
         glGetTextureImage(
-            height_texture, 0, GL_RED, GL_FLOAT, terrain_size * terrain_size * sizeof(float),
-            mapping.data());
-        gl::throw_if_error();
+            height_texture, 0, GL_RED, GL_FLOAT,
+            terrain_size * terrain_size * sizeof(float), 
+            actual_terrain_heights.data());
     }
 
-    auto terrain_normals = gl::Buffer<Vec3>(
-        terrain_size * terrain_size,
-        GL_MAP_WRITE_BIT);
-    {
-        auto mapping = gl::BufferMapping(terrain_normals, GL_WRITE_ONLY);
+    auto terrain_heights = gl::Buffer<GLfloat>(
+        actual_terrain_heights);
 
-        // Undefined behaviour.
+    auto actual_terrain_normals = std::vector<Vec3>(
+        terrain_size * terrain_size);
+    {
         glGetTextureImage(
             normal_texture, 0, GL_RGB, GL_FLOAT, terrain_size * terrain_size * sizeof(Vec3),
-            mapping.data());
-        gl::throw_if_error();
+            actual_terrain_normals.data());
     }
+    auto terrain_normals = gl::Buffer<Vec3>(actual_terrain_normals);
 
     auto terrain_uvs = gl::Buffer<Vec2>(
         terrain_size * terrain_size,
@@ -376,38 +434,121 @@ int throwing_main() {
         }
     }
 
+    auto grass_transforms = gl::Buffer<Mat4>(1'000, GL_MAP_WRITE_BIT);
+    {
+        auto mapping = gl::BufferMapping(grass_transforms, GL_WRITE_ONLY);
+        for(std::size_t i = 0; i < 1'000; ++i) {
+            auto x = float(std::rand() % terrain_size);
+            auto y = 100.f;
+            auto z = float(std::rand() % terrain_size);
+            mapping[i] = translation(x, y, z);
+        }
+    }
+
+    auto grass_program = gl::program({
+        {
+            GL_VERTEX_SHADER,
+            file(root + "src/shader/terrain/grass.vs").c_str()
+        },
+        {
+            GL_FRAGMENT_SHADER,
+            file(root + "src/shader/terrain/grass.fs").c_str()
+        }
+    });
+    
+    auto grass_vertex_array = gl::VertexArray();
+    {
+        for(int i = 0; i < 4; ++i) {
+            glVertexArrayVertexBuffer( 
+                grass_vertex_array, i, grass_transforms, 0, 4 * stride(grass_transforms));
+            glVertexArrayAttribFormat(
+                grass_vertex_array, i, 2, GL_FLOAT, GL_FALSE, 0);
+            glVertexArrayBindingDivisor(
+                grass_vertex_array, i, 1);
+
+            {
+                auto l = gl::AttributeLocation(grass_program, "model");
+                glVertexArrayAttribBinding(grass_vertex_array, l, 0);
+                glEnableVertexArrayAttrib(grass_vertex_array, l);
+            }
+        }
+        {
+            glVertexArrayVertexBuffer( 
+                grass_vertex_array, 0, quad_positions, 0, stride(quad_positions));
+            glVertexArrayAttribFormat(
+                grass_vertex_array, 0, 2, GL_FLOAT, GL_FALSE, 0);
+
+            {
+                auto l = gl::AttributeLocation(grass_program, "position");
+                glVertexArrayAttribBinding(grass_vertex_array, l, 0);
+                glEnableVertexArrayAttrib(grass_vertex_array, l);
+            }
+        }
+    }
+
     glActiveTexture(GL_TEXTURE0);
     gl::bind(color_texture);
 
-    auto camera = scene::Camera();
-    camera.pitch = 0.5f; 
-    camera.position = Vec3{0.f, 100.f, 0.f};
+    auto projection = PerspectiveProjection();
+    auto view = View();
+    view.pitch += 0.2f;
+    view.position.at(1) = 100.f;
+
+    Vec3 velocity = Vec3{0.f, 0.f, 0.f};
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     while(!glfwWindowShouldClose(window)) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, 1280, 720);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        if(glfwGetKey(window, GLFW_KEY_A)) {
-            camera.yaw += 0.02f;
-        }
-        if(glfwGetKey(window, GLFW_KEY_D))
         {
-            camera.yaw -= 0.02f;
+            Vec2 d = current_cursor_pos - previous_cursor_pos;
+            view.yaw += d.at(0) / 500.f;
+            view.pitch += d.at(1) / 500.f;
+
+            previous_cursor_pos = current_cursor_pos;
         }
-        if(glfwGetKey(window, GLFW_KEY_DOWN)) {
-            camera.pitch += 0.02f;
+        {
+            if(glfwGetKey(window, GLFW_KEY_S)) {
+                view.position = view.position
+                + xyz(transform(view) * Vec4{0.f, 0.f, -1.f, 0.f});
+            }
+            if(glfwGetKey(window, GLFW_KEY_W)) {
+                view.position = view.position
+                + xyz(transform(view) * Vec4{0.f, 0.f, 1.f, 0.f});
+            }
         }
-        if(glfwGetKey(window, GLFW_KEY_S)) {
-            camera.position = camera.position
-            + xyz(rotation_y(camera.yaw) * Vec4{0.f, 0.f, -1.f, 1.f});
-        }
-        if(glfwGetKey(window, GLFW_KEY_UP)) {
-            camera.pitch -= 0.02f;
-        }
-        if(glfwGetKey(window, GLFW_KEY_W)) {
-            camera.position = camera.position
-            + xyz(rotation_y(camera.yaw) * Vec4{0.f, 0.f, 1.f, 1.f});
+        {
+            velocity[1] -= 9.81f / 100.f;
+            view.position += velocity;
+
+            auto i = floor(view.position);
+            auto f = fract(view.position);
+
+            auto h = [&](Vec3 xyz) {
+                auto idx = std::size_t(xyz[2]) * terrain_size
+                    + std::size_t(xyz[0]);
+                return actual_terrain_heights[idx];
+            };
+
+            auto ih = gl::mix(
+                gl::mix(
+                    h(i + Vec3{0.f, 0.f, 0.f}),
+                    h(i + Vec3{1.f, 0.f, 0.f}),
+                    f[0]),
+                gl::mix(
+                    h(i + Vec3{0.f, 0.f, 1.f}),
+                    h(i + Vec3{1.f, 0.f, 1.f}),
+                    f[0]),
+                f[1]);
+
+            auto dif = ih - view.position[1] + 20.f;
+            if(dif > 0) {
+                view.position[1] += dif;
+                velocity = Vec3{0.f, 0.f, 0.f};
+            }
         }
 
         {
@@ -417,8 +558,8 @@ int throwing_main() {
             glCullFace(GL_FRONT);
             glEnable(GL_CULL_FACE);
 
-            auto v = transformation(camera);
-            auto p = perspective(camera);
+            auto v = inverse(transform(view));
+            auto p = transform(projection);
 
             auto mv = v;
             auto mvp = p * mv;
@@ -438,17 +579,17 @@ int throwing_main() {
                     2 * 3 * (terrain_size - 1) * (terrain_size - 1),
                     GL_UNSIGNED_INT, 0);
             }
-            {
-                gl::use(normal_renderer);
-                gl::bind(terrain_debug);
+            // {
+            //     gl::use(normal_renderer);
+            //     gl::bind(terrain_debug);
 
-                gl::Uniform(normal_renderer, "mvp") = mvp;
+            //     gl::Uniform(normal_renderer, "mvp") = mvp;
 
-                gl::draw_elements(
-                    GL_TRIANGLES,
-                    2 * 3 * (terrain_size - 1) * (terrain_size - 1),
-                    GL_UNSIGNED_INT, 0);
-            }
+            //     gl::draw_elements(
+            //         GL_TRIANGLES,
+            //         2 * 3 * (terrain_size - 1) * (terrain_size - 1),
+            //         GL_UNSIGNED_INT, 0);
+            // }
         }
 
         glfwSwapBuffers(window);

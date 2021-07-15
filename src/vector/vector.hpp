@@ -20,6 +20,16 @@ struct Vector {
     }
 
     constexpr
+    auto& operator[](std::size_t i) const {
+        return elements[i];
+    }
+
+    constexpr
+    auto& operator[](std::size_t i) {
+        return elements[i];
+    }
+
+    constexpr
     auto size() const {
         return Size;
     }

@@ -36,14 +36,35 @@ float gradient_noise2(vec2 p) {
         t[1]);
 }
 
+vec2 worley_hash2( in vec2 f ) { 
+    float n = f.x+131.1*f.y;
+    vec2 h =  fract(sin(vec2(n,n+113.0))*43758.5453123); 
+    // Domain: [0, 1]^2.
+    return h;
+}
+
+float worley(vec2 p) {
+    vec2 c = floor(p) - vec2(1, 1);
+    float min_dst = sqrt(2.f);
+    for(int j = 0; j < 3; ++j)
+    for(int i = 0; i < 3; ++i) {
+        vec2 sc = c + vec2(i, j);
+        vec2 seed = sc + worley_hash2(sc);
+        min_dst = min(min_dst, distance(seed, p));
+    }
+    return min_dst / sqrt(2.f);
+}
+
 float terrain(vec2 p) {
+    // return 64.f * (1.f - worley(p / 128.f));
     float n = 64.f * gradient_noise2(p / 128.f);
     n += 32.f * gradient_noise2(p / 64.f);
     n += 16.f * gradient_noise2(p / 32.f);
     n += 8.f * gradient_noise2(p / 16.f);
     n += 4.f * gradient_noise2(p / 8.f);
     n = max(n, 0);
-    return n;
+    n *= worley(p / 128.f);
+    return 4 * n;
 }
 
 vec3 gradient(vec2 p, float e) {
@@ -59,10 +80,12 @@ float slope_radians(vec2 p, float e) {
 }
 
 void main() {
-    float h = terrain(gl_FragCoord.xy);
+    vec2 coords = gl_FragCoord.xy / 4.f;
+
+    float h = terrain(coords);
     fragment_height = h;
 
-    float slope_0_1 = abs(slope_radians(gl_FragCoord.xy, 1.f) / (pi / 2.f));
+    float slope_0_1 = abs(slope_radians(coords, 1.f) / (pi / 2.f));
 
     vec3 grass = vec3(51.f, 204.f, 51.f) / 255.f;
     vec3 rock = vec3(128.f, 128.f, 128.f) / 255.f;
@@ -82,14 +105,14 @@ void main() {
                     mix(
                         grass,
                         rock,
-                        smoothstep(0.4f, 0.5f, slope_0_1)),
-                    smoothstep(2.f, 4.f, h + 5.f * slope_0_1)),
+                        smoothstep(0.6f, 0.8f, slope_0_1)),
+                    smoothstep(4.f * 2.f, 4.f * 4.f, h + 5.f * slope_0_1)),
             snow,
-            smoothstep(25.f, 30.f, h - 10.f * slope_0_1));
+            smoothstep(4.f * 25.f, 4.f * 30.f, h - 4.f * 10.f * slope_0_1));
     }
 
     fragment_color = vec4(color, 1.f);
 
-    vec3 g = gradient(gl_FragCoord.xy, 1.f);
+    vec3 g = gradient(coords, 1.f);
     fragment_normal = normalize(vec3(-g.x, 1, -g.y));
 }
