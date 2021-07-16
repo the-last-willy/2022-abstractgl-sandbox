@@ -2,8 +2,8 @@
 
 #include "matrix.hpp"
 
-#include "vector/vector.hpp"
-#include "vector/xyzw.hpp"
+#include "gl/vector/vector.hpp"
+#include "gl/vector/xyzw.hpp"
 
 namespace tlw {
 

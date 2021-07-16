@@ -3,6 +3,7 @@
 layout(location = 0) out vec4 fragment_color;
 layout(location = 1) out float fragment_height;
 layout(location = 2) out vec3 fragment_normal;
+layout(location = 3) out float fragment_vegetation;
 
 float pi = 3.141593;
 
@@ -97,6 +98,7 @@ void main() {
 
     if(h <= 0) {
         color = water;
+        fragment_vegetation = 0.f;
     } else {
         color =
             mix(
@@ -109,6 +111,18 @@ void main() {
                     smoothstep(4.f * 2.f, 4.f * 4.f, h + 5.f * slope_0_1)),
             snow,
             smoothstep(4.f * 25.f, 4.f * 30.f, h - 4.f * 10.f * slope_0_1));
+
+        fragment_vegetation =
+           mix(
+               mix(
+                   0.f,
+                   mix(
+                       1.f,
+                       0.f,
+                       smoothstep(0.6f, 0.8f, slope_0_1)),
+                   smoothstep(4.f * 2.f, 4.f * 4.f, h + 5.f * slope_0_1)),
+           0.f,
+           smoothstep(4.f * 25.f, 4.f * 30.f, h - 4.f * 10.f * slope_0_1));
     }
 
     fragment_color = vec4(color, 1.f);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "inverse.hpp"
+#include "lookat.hpp"
 #include "matrix.hpp"
 #include "multiplication.hpp"
 #include "rotation_x.hpp"

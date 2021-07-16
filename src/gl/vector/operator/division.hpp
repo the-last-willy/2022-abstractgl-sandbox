@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vector/vector.hpp"
+#include "gl/vector/vector.hpp"
 
 namespace tlw {
 

@@ -2,7 +2,7 @@
 
 #include "length.hpp"
 
-#include "vector/operator/division.hpp"
+#include "gl/vector/operator/division.hpp"
 
 #include <stdexcept>
 

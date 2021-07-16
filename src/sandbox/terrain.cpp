@@ -1,8 +1,6 @@
 
 #include "gl/all.hpp"
-#include "matrix/all.hpp"
 #include "scene/all.hpp"
-#include "vector/all.hpp"
 #include "file.hpp"
 #include "pi.hpp"
 #include "root.hpp"
@@ -21,49 +19,6 @@
 #include <vector>
 
 using namespace tlw;
-
-struct PerspectiveProjection {
-    float aspect_ratio = 16.f / 9.f;
-
-    float near = 0.1f;
-    float far = 1000.f;
-};
-
-constexpr
-auto transform(const PerspectiveProjection& p) {
-    // View space -> Clip space
-    // (near, far) -> (-near, far) 
-
-    // | 1 | 0 | 0 | 0 | = x
-    // | 0 | 1 | 0 | 0 | = y
-    // | 0 | 0 | a | b | -> (-near, far)
-    // | 0 | 0 | 1 | 0 | = z
-    
-    auto a = (p.far + p.near) / (p.far - p.near);
-    auto b = -2 * p.far * p.near / (p.far - p.near);
-
-    auto y = p.aspect_ratio;
-    return Mat4{ // A line is a column.
-        1.f, 0.f,  0.f, 0.f, 
-        0.f,   y,  0.f, 0.f,
-        0.f, 0.f,    a, 1.f,
-        0.f, 0.f,    b, 0.f};
-}
-
-struct View {
-    Vec3 position = Vec3{1024.f, 0.f, 1024.f};
-
-    // Aircraft rotation.
-    float yaw = 0.f;
-    float pitch = 0.f;
-};
-
-constexpr
-auto transform(const View& v) {
-    return translation(v.position)
-        * rotation_y(v.yaw)
-        * rotation_x(v.pitch);
-}
 
 Vec2 previous_cursor_pos;
 Vec2 current_cursor_pos;
@@ -87,7 +42,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 }
 
 int throwing_main() {
-    std::srand(std::time(0));
+    std::srand(static_cast<unsigned>(std::time(0)));
 
     GLFWwindow* window;
     {
@@ -187,30 +142,35 @@ int throwing_main() {
     auto normal_texture = gl::Texture2();
     {
         glTextureStorage2D(normal_texture, 1, GL_RGB32F, terrain_size, terrain_size);
-        gl::throw_if_error();
         glTextureParameteri(normal_texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTextureParameteri(normal_texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        gl::throw_if_error();
     }
+
+    auto vegetation_texture = gl::Texture2();
+	{
+		glTextureStorage2D(vegetation_texture, 1, GL_R32F, terrain_size, terrain_size);
+		glTextureParameteri(vegetation_texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureParameteri(vegetation_texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
 
     auto frame_buffer = gl::FrameBuffer();
     {
         glNamedFramebufferTexture(
             frame_buffer, GL_COLOR_ATTACHMENT0, color_texture, 0);
-        gl::throw_if_error();
         glNamedFramebufferTexture(
             frame_buffer, GL_COLOR_ATTACHMENT1, height_texture, 0);
-        gl::throw_if_error();
         glNamedFramebufferTexture(
             frame_buffer, GL_COLOR_ATTACHMENT2, normal_texture, 0);
-        gl::throw_if_error();
+	    glNamedFramebufferTexture(
+		    frame_buffer, GL_COLOR_ATTACHMENT3, vegetation_texture, 0);
         gl::throw_if_incomplete(frame_buffer);
 
         {
-            auto buffers = std::array<GLenum, 3>{
+            auto buffers = std::array<GLenum, 4>{
                 GL_COLOR_ATTACHMENT0,
                 GL_COLOR_ATTACHMENT1,
-                GL_COLOR_ATTACHMENT2};
+                GL_COLOR_ATTACHMENT2,
+                GL_COLOR_ATTACHMENT3};
             glNamedFramebufferDrawBuffers(
                 frame_buffer, GLsizei(size(buffers)), data(buffers));
         }
@@ -222,7 +182,6 @@ int throwing_main() {
         glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer);
         gl::bind(quad);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        gl::throw_if_error();
     }
 
     auto terrain_coords = gl::Buffer<Vec2>();
@@ -299,6 +258,12 @@ int throwing_main() {
                 float(j) / (terrain_size - 1)};
         }
     }
+
+    auto terrain_vegetation = std::vector<GLfloat>(terrain_size * terrain_size);
+	{
+		glGetTextureImage(vegetation_texture, 0, GL_RED, GL_FLOAT,
+	        sizeof(GLfloat) * size(terrain_vegetation), terrain_vegetation.data());
+	}
 
     auto terrain_renderer = gl::program({
         {
@@ -434,60 +399,29 @@ int throwing_main() {
         }
     }
 
-    auto grass_transforms = gl::Buffer<Mat4>(1'000, GL_MAP_WRITE_BIT);
-    {
-        auto mapping = gl::BufferMapping(grass_transforms, GL_WRITE_ONLY);
-        for(std::size_t i = 0; i < 1'000; ++i) {
-            auto x = float(std::rand() % terrain_size);
-            auto y = 100.f;
-            auto z = float(std::rand() % terrain_size);
-            mapping[i] = translation(x, y, z);
-        }
-    }
+    auto grass = Grass();
+	{
+		auto transforms = std::vector<Mat4>(10'000);
+		auto i = 0;
+		while(i != size(transforms)) {
+			auto x = std::rand() % terrain_size;
+			auto z = std::rand() % terrain_size;
+			auto r = (std::rand() % 1'000) / 1000.f;
+			auto idx = std::size_t(z) * terrain_size + std::size_t(x);
+			if(terrain_vegetation[idx] > r) {
+				transforms[i++] =
+					translation(
+						float(x), actual_terrain_heights[idx], float(z))
+					* scaling(3.f);
+			}
+		}
+//		for(int i = 0; i < 1'000; ++i) {
+//			std::cout << transforms[i](3, 0) << " " << transforms[i](3, 1) << " " << transforms[i](3, 2) << std::endl;
+//		}
+		grass.instances(transforms);
+	}
 
-    auto grass_program = gl::program({
-        {
-            GL_VERTEX_SHADER,
-            file(root + "src/shader/terrain/grass.vs").c_str()
-        },
-        {
-            GL_FRAGMENT_SHADER,
-            file(root + "src/shader/terrain/grass.fs").c_str()
-        }
-    });
-    
-    auto grass_vertex_array = gl::VertexArray();
-    {
-        for(int i = 0; i < 4; ++i) {
-            glVertexArrayVertexBuffer( 
-                grass_vertex_array, i, grass_transforms, 0, 4 * stride(grass_transforms));
-            glVertexArrayAttribFormat(
-                grass_vertex_array, i, 2, GL_FLOAT, GL_FALSE, 0);
-            glVertexArrayBindingDivisor(
-                grass_vertex_array, i, 1);
-
-            {
-                auto l = gl::AttributeLocation(grass_program, "model");
-                glVertexArrayAttribBinding(grass_vertex_array, l, 0);
-                glEnableVertexArrayAttrib(grass_vertex_array, l);
-            }
-        }
-        {
-            glVertexArrayVertexBuffer( 
-                grass_vertex_array, 0, quad_positions, 0, stride(quad_positions));
-            glVertexArrayAttribFormat(
-                grass_vertex_array, 0, 2, GL_FLOAT, GL_FALSE, 0);
-
-            {
-                auto l = gl::AttributeLocation(grass_program, "position");
-                glVertexArrayAttribBinding(grass_vertex_array, l, 0);
-                glEnableVertexArrayAttrib(grass_vertex_array, l);
-            }
-        }
-    }
-
-    glActiveTexture(GL_TEXTURE0);
-    gl::bind(color_texture);
+    glBindTextureUnit(0, color_texture);
 
     auto projection = PerspectiveProjection();
     auto view = View();
@@ -561,6 +495,7 @@ int throwing_main() {
             auto v = inverse(transform(view));
             auto p = transform(projection);
 
+            auto vp = p * v;
             auto mv = v;
             auto mvp = p * mv;
 
@@ -573,12 +508,25 @@ int throwing_main() {
                 gl::Uniform(terrain_renderer, "mv") = mv;
                 gl::Uniform(terrain_renderer, "mvp") = mvp;
                 gl::Uniform(terrain_renderer, "tex") = 0;
-                
+
                 gl::draw_elements(
                     GL_TRIANGLES,
                     2 * 3 * (terrain_size - 1) * (terrain_size - 1),
                     GL_UNSIGNED_INT, 0);
             }
+	        {
+		        glDisable(GL_CULL_FACE);
+
+	        	gl::use(grass.program);
+	        	gl::bind(grass.vertex_array);
+
+		        gl::Uniform(grass.program, "vp") = vp;
+
+	        	glDrawArraysInstanced(GL_TRIANGLES, 0, 12, 1'000);
+
+		        glCullFace(GL_FRONT);
+		        glEnable(GL_CULL_FACE);
+	        }
             // {
             //     gl::use(normal_renderer);
             //     gl::bind(terrain_debug);

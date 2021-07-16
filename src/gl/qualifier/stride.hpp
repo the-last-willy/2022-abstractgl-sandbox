@@ -3,9 +3,9 @@
 namespace tlw {
 namespace gl {
 
-template<typename Traits>
+template<typename Type>
 struct Stride {
-    using value_type = Traits;
+    using value_type = Type;
 
     constexpr Stride() noexcept = default;
 
@@ -25,6 +25,6 @@ struct Stride {
 };
 
 template<typename Type>
-Stride(Type) -> Stride<Traits>;
+Stride(Type) -> Stride<Type>;
 
 }}

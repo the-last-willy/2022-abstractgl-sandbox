@@ -2,7 +2,7 @@
 
 #include "buffer.hpp"
 
-#include "gl/stride.hpp"
+#include "gl/qualifier/stride.hpp"
 
 namespace tlw {
 namespace gl {

@@ -2,7 +2,7 @@
 
 #include "matrix.hpp"
 
-#include "vector/all.hpp"
+#include "gl/vector/all.hpp"
 
 namespace tlw {
 

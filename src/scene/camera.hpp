@@ -1,7 +1,7 @@
 #pragma once
 
-#include "matrix/all.hpp"
-#include "vector/all.hpp"
+#include "gl/matrix/all.hpp"
+#include "gl/vector/all.hpp"
 
 namespace tlw {
 namespace scene {
