@@ -9,7 +9,7 @@ struct Stride {
 
     constexpr Stride() noexcept = default;
 
-    constexpr Stride(value_type t) noexcept
+    constexpr explicit Stride(value_type t) noexcept
         : value(t)
     {}
 
@@ -24,7 +24,7 @@ struct Stride {
     value_type value = 0;
 };
 
-template<typename Traits>
-Stride(Traits) -> Stride<Traits>;
+template<typename Type>
+Stride(Type) -> Stride<Traits>;
 
 }}
