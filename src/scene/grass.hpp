@@ -48,7 +48,7 @@ struct Grass {
 	}
 
 	void instances(std::span<Mat4> s) {
-		instance_count = size(s);
+		instance_count = GLuint(size(s));
 		transform_buffer = gl::Buffer<Mat4>(s);
 		{
 			glVertexArrayVertexBuffer(

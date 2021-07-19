@@ -1,4 +1,6 @@
 
+#include "agl/all.hpp"
+
 #include "gl/all.hpp"
 #include "scene/all.hpp"
 #include "file.hpp"
@@ -109,16 +111,25 @@ int throwing_main() {
 
     auto quad = gl::VertexArray();
     {
-        glVertexArrayVertexBuffer( 
-            quad, 0, quad_positions, 0, stride(quad_positions));
-        glVertexArrayAttribFormat(
-            quad, 0, 2, GL_FLOAT, GL_FALSE, 0);
+        auto va = agl::VertexArray(quad);
+        auto bi = agl::BindingIndex<GLuint>(0);
+        agl::vertex_buffer( 
+            va,
+            bi,
+            agl::Buffer(quad_positions),
+            agl::Offset<GLintptr>(0),
+            agl::Stride<GLsizei>(2 * sizeof(GLfloat)));
 
-        {
-            auto l = gl::AttributeLocation(terrain_generator, "position");
-            glVertexArrayAttribBinding(quad, l, 0);
-            glEnableVertexArrayAttrib(quad, l);
-        }
+        auto l = agl::attribute_location(
+            agl::Program(terrain_generator),
+            "position");
+        agl::attribute_format(
+            va,
+            l,
+            agl::Size<GLint>(2),
+            GL_FLOAT);
+        agl::attribute_binding(va, l, bi);
+        agl::enable(va, l);
     }
 
     auto color_texture = gl::Texture2();
@@ -262,7 +273,7 @@ int throwing_main() {
     auto terrain_vegetation = std::vector<GLfloat>(terrain_size * terrain_size);
 	{
 		glGetTextureImage(vegetation_texture, 0, GL_RED, GL_FLOAT,
-	        sizeof(GLfloat) * size(terrain_vegetation), terrain_vegetation.data());
+	        GLsizei(sizeof(GLfloat) * size(terrain_vegetation)), terrain_vegetation.data());
 	}
 
     auto terrain_renderer = gl::program({
