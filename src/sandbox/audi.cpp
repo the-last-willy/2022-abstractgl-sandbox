@@ -1,6 +1,5 @@
 #include "gl/all.hpp"
 #include "scene/all.hpp"
-#include "vector/all.hpp"
 #include "file.hpp"
 #include "root.hpp"
 
