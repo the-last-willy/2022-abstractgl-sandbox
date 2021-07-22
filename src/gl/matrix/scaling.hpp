@@ -1,8 +1,9 @@
 #pragma once
 
-#include "matrix.hpp"
+#include "agl/glsl/mat/mat4.hpp"
 
 namespace tlw {
+
 
 inline
 auto scaling(float s) {
