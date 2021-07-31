@@ -30,6 +30,11 @@ INTERFACE
     glfw
 )
 
+# Executable 'lsystem'
+
+add_executable(lsystem src/sandbox/lsystem.cpp)
+target_link_libraries(lsystem PRIVATE common)
+
 # Executable 'terrain'
 
 add_executable(terrain src/sandbox/terrain.cpp)
@@ -39,3 +44,8 @@ target_link_libraries(terrain PRIVATE common)
 
 add_executable(tree src/sandbox/tree.cpp)
 target_link_libraries(tree PRIVATE common)
+
+# Executable 'tree'
+
+add_executable(tree_traversal src/sandbox/tree_traversal.cpp)
+target_link_libraries(tree_traversal PRIVATE common)

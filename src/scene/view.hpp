@@ -11,6 +11,7 @@ struct View {
 	// Aircraft rotation.
 	float yaw = 0.f;
 	float pitch = 0.f;
+	float roll = 0.f;
 };
 
 constexpr
@@ -18,6 +19,7 @@ auto transform(const View& v) {
 	return agl::translation(v.position)
 		* agl::rotation_y(v.yaw)
 		* agl::rotation_x(v.pitch)
+		* agl::rotation_z(v.roll)
 		* agl::translation(v.rotation_center);
 }
 

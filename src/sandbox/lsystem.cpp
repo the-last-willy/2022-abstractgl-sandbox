@@ -1,23 +1,17 @@
 #include <iostream>
 #include <map>
 
-struct TurtleState {
-
-};
-
-struct Turtle {
-
-};
-
 int main() {
     auto rules = std::map<char, std::string>{
-        {'F', "FF"},
-        {'X', "F+[[X]-X]-F[-FX]+X"},};
+        {'A', "[&FL!A]/////'[&FL!A]///////'[&FL!A]"},
+        {'F', "S/////F"},
+        {'S', "FL"},
+        {'L', " ['''^^{-f+f+f-|-f+f+f}]" }};
     
-    auto current = std::string("X");
+    auto current = std::string("A");
     auto next = std::string("");
 
-    for(int i = 0; i < 3; ++i) {
+    for(int i = 1; i < 7; ++i) {
         for(auto c : current) {
             auto it = rules.find(c);
             if(it == end(rules)) {
@@ -26,10 +20,9 @@ int main() {
                 next += it->second;
             }
         }
-        std::cout << next << std::endl;
         current = std::move(next);
         next.clear();
     }
 
-    
+    std::cout << current;
 }
