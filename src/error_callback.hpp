@@ -1,13 +1,6 @@
 #pragma once
 
-#include "error/error.hpp"
-
-#include <glad/glad.h>
-
-#include <iostream>
-
-namespace tlw {
-namespace gl {
+#include <stdexcept>
 
 inline
 void error_callback(
@@ -115,7 +108,5 @@ void error_callback(
     printf("%d: %s of %s severity, raised from %s: %s\n",
             id, _type, _severity, _source, msg);
 
-    throw Error(type);
+    throw std::exception();
 }
-
-}}

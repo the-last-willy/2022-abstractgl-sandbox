@@ -3,6 +3,7 @@
 #include "engine/all.hpp"
 #include "scene/all.hpp"
 #include "turtle/all.hpp"
+#include "error_callback.hpp"
 #include "file.hpp"
 #include "pi.hpp"
 #include "root.hpp"
@@ -50,25 +51,8 @@ rtti_uniform_map make_rtti_uniforms(TypeList<>) {
     return {};
 }
 
-struct Attribute {
-    agl::Size<GLint> size = agl::Size<GLint>(0);
-    agl::Stride<GLsizei> stride = agl::Stride<GLsizei>(0);
-    GLenum type;
-};
-
-struct Transform {
-    agl::Vec3 translation = agl::vec3(agl::null);
-    agl::Mat4 rotation = agl::mat4(agl::identity);
-};
-
-inline
-agl::Mat4 mat(const Transform& t) {
-    return agl::translation(t.translation)
-    * t.rotation;
-}
-
-Vec2 previous_cursor_pos;
-Vec2 current_cursor_pos;
+agl::Vec2 previous_cursor_pos;
+agl::Vec2 current_cursor_pos;
 
 static void cursor_position_callback(GLFWwindow*, double x, double y) {
     current_cursor_pos = {float(x), float(y)};
@@ -129,7 +113,7 @@ int throwing_main() {
         }
 
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-        glDebugMessageCallback(&gl::error_callback, NULL);
+        glDebugMessageCallback(&error_callback, NULL);
     }
 
     auto objects = std::deque<Object>();
@@ -194,8 +178,8 @@ int throwing_main() {
                 geometry.attributes["position3"] = AttributeBuffer{
                     .buffer = std::move(b),
 
-                    .size = agl::Size<GLint>(sizeof(GLfloat)),
-                    .stride = agl::Stride<GLsizei>(3),
+                    .size = agl::Size<GLint>(3),
+                    .stride = agl::Stride<GLsizei>(3 * sizeof(GLfloat)),
                     .type = GL_FLOAT
                 };
             }
@@ -208,8 +192,8 @@ int throwing_main() {
                 geometry.attributes["normal3"] = AttributeBuffer{
                     .buffer = std::move(buf),
 
-                    .size = agl::Size<GLint>(sizeof(GLfloat)),
-                    .stride = agl::Stride<GLsizei>(3),
+                    .size = agl::Size<GLint>(3),
+                    .stride = agl::Stride<GLsizei>(3 * sizeof(GLfloat)),
                     .type = GL_FLOAT
                 };
             }
@@ -255,9 +239,9 @@ int throwing_main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         {
-            Vec2 d = current_cursor_pos - previous_cursor_pos;
-            view.yaw -= d.at(0) / 500.f;
-            view.pitch -= d.at(1) / 500.f;
+            agl::Vec2 d = current_cursor_pos - previous_cursor_pos;
+            view.yaw -= d[0] / 500.f;
+            view.pitch -= d[1] / 500.f;
 
             previous_cursor_pos = current_cursor_pos;
         }
@@ -295,7 +279,7 @@ int throwing_main() {
                     }
                 }
 
-                auto view_transform =  inverse(transform(view)) * agl::scaling3(1 / 5.f);
+                auto view_transform =  inverse(transform(view)) * agl::scaling3(1 / 10.f);
 
                 auto mvp = transform(proj) * view_transform * model;
                 object.uniforms["mvp"] = std::move(mvp);
@@ -345,16 +329,6 @@ int throwing_main() {
 int main() {
     try {
         return throwing_main();
-    } catch(const gl::Error& e) {
-        std::cerr << "tlw::gl::Error(" << std::hex << e.category() << ")" << std::endl;
-    } catch(const gl::CompilationFailure&) {
-        std::cerr << "tlw::gl::CompilationFailure" << std::endl;
-    } catch(const gl::IncompleteFrameBuffer& i) {
-        std::cerr << "tlw::gl::IncompleteFrameBuffer: " << std::hex << i.category() << std::endl;
-    } catch(const gl::InvariantViolation&) {
-        std::cerr << "tlw::gl::InvariantViolation" << std::endl;
-    } catch(const gl::LinkageFailure&) {
-        std::cerr << "tlw::gl::LinkageFailure" << std::endl;
     } catch(const std::exception& e) {
         std::cerr << "std::exception: " << e.what() << std::endl;
     } catch(...) {
