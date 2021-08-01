@@ -1,8 +1,6 @@
 
 #include "agl/all.hpp"
 
-#include "gl/all.hpp"
-#include "scene/all.hpp"
 #include "file.hpp"
 #include "pi.hpp"
 #include "root.hpp"
