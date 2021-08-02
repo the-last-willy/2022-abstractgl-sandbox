@@ -1,6 +1,7 @@
 #include "agl/all.hpp"
 
 #include "engine/all.hpp"
+#include "mesh/all.hpp"
 #include "scene/all.hpp"
 #include "turtle/all.hpp"
 #include "error_callback.hpp"
@@ -29,6 +30,32 @@
 
 using namespace tlw;
 
+inline
+agl::Vec3 hash(agl::Vec3 x) {
+    x = agl::vec3(
+        agl::dot(x, agl::vec3(127.1f, 311.7f, 74.7f)),
+        agl::dot(x, agl::vec3(269.5f, 183.3f, 246.1f)),
+        agl::dot(x, agl::vec3(113.5f, 271.9f, 124.6f)));
+	return agl::fract(agl::sin(x) * 43758.5453123f);
+}
+
+
+inline
+agl::Vec3 voronoi(agl::Vec3 v) {
+    auto d = agl::vec3(1., 1., 1.);
+    auto i = agl::floor(v);
+    for(float j = -1.; j <= 1.; j += 1.f)
+    for(float k = -1.; k <= 1.; k += 1.f)
+    for(float l = -1.; l <= 1.; l += 1.f) {
+        auto seed = i + agl::vec3(j, k, l) + hash(i + agl::vec3(j, k, l));
+        auto diff = seed - v;
+        if(agl::dot(diff, diff) < agl::dot(d, d)) {
+            d = diff;
+        }
+    }
+    return d;
+}
+
 template<typename... Types>
 struct TypeList {};
 
@@ -49,6 +76,29 @@ rtti_uniform_map make_rtti_uniforms(TypeList<Head, Tail...>) {
 inline
 rtti_uniform_map make_rtti_uniforms(TypeList<>) {
     return {};
+}
+
+struct Vertex {
+    agl::Vec3 color;
+    agl::Vec3 normal;
+    agl::Vec3 position;
+    agl::Vec3 texcoords;
+};
+
+inline
+auto barycentric_interpolation(
+    const Vertex& a,
+    const Vertex& b,
+    const Vertex& c,
+    float tb, float tc)
+{
+    auto v = Vertex();
+    auto ta = 1.f - tb - tc;
+    v.color = ta * a.color + tb * b.color + tc * c.color;
+    v.normal = ta * a.normal + tb * b.normal + tc * c.normal;
+    v.position = ta * a.position + tb * b.position + tc * c.position;
+    v.texcoords = ta * a.texcoords + tb * b.texcoords + tc * c.texcoords;
+    return v;
 }
 
 agl::Vec2 previous_cursor_pos;
@@ -154,13 +204,161 @@ int throwing_main() {
     //     objects.push_back(std::move(object));
     // }
 
+
+    auto rock_geometry = std::shared_ptr<Geometry>();
+    {
+        auto mesh = mesh::FaceVertex<Vertex>();
+        for(std::size_t i = 0; i < 12; ++i) {
+            auto offset = 3 * i;
+            mesh.triangles.push_back(mesh::Triangle{
+                cube_indexes[offset + 0],
+                cube_indexes[offset + 1],
+                cube_indexes[offset + 2],});
+        }
+        for(std::size_t i = 0; i < 24; ++i) {
+            mesh.vertices.push_back(Vertex{
+                .normal = cube_normals[i],
+                .position = cube_positions[i],
+                .texcoords = cube_texcoords[i],});
+        }
+        mesh = mesh::subdivided(mesh, 30);
+
+        // Editing.
+        for(auto& v : mesh.vertices) {
+            v.position = agl::normalize(v.position);
+            auto sphere_normal = v.position;
+
+            auto displacement = [sn = sphere_normal](agl::Vec3 v) {
+                return sn * agl::length(voronoi(1.2f * v)) / std::sqrt(2.f);
+            };
+
+            v.position = v.position + displacement(v.position);
+
+            auto tg = agl::Vec3();
+            if(std::abs(sphere_normal[0]) == 1.f) {
+                tg = agl::cross(sphere_normal, agl::vec3(1.f, 0.f, 0.f));
+            } else {
+                tg = agl::cross(sphere_normal, agl::vec3(0.f, 1.f, 0.f));
+            }
+            tg = agl::normalize(tg);
+
+            // binormal
+            auto bn = agl::cross(tg, sphere_normal);
+
+            auto e = 0.15f;
+            auto dx = (length(displacement(agl::normalize(sphere_normal + e * tg)))
+                - length(displacement(agl::normalize(sphere_normal - e * tg)))) / e / 2.f;
+            auto dy = (length(displacement(agl::normalize(sphere_normal + e * bn)))
+                - length(displacement(agl::normalize(sphere_normal - e * bn)))) / e / 2.f;
+
+            auto normal = agl::normalize(agl::vec3(1.f, -dx, -dy));
+            v.normal = agl::normalize(
+                normal[0] * sphere_normal
+                + normal[1] * tg
+                + normal[2] * bn);
+        }
+
+        auto g = Geometry();
+        g.primitive_count = agl::Count<GLsizei>(3 * size(mesh.triangles));
+        { // Colors.
+            auto b = agl::buffer();
+            agl::storage(b, size(mesh.vertices) * sizeof(agl::Vec3), GL_MAP_WRITE_BIT);
+            auto mapping = agl::map<agl::Vec3>(b, GL_WRITE_ONLY);
+            auto idx = 0;
+            for(auto& v : mesh.vertices) {
+                mapping[idx++] = v.color;
+            }
+            agl::unmap(b);
+            g.attributes["color_rgb"] = AttributeBuffer{
+                .buffer = std::move(b),
+
+                .size = agl::Size<GLint>(3),
+                .stride = agl::Stride<GLsizei>(12),
+                .type = GL_FLOAT,
+            };
+        }
+        { // Indices.
+            auto b = agl::buffer();
+            agl::storage(b, size(mesh.triangles) * sizeof(mesh::Triangle), GL_MAP_WRITE_BIT);
+            auto mapping = agl::map<GLuint>(b, GL_WRITE_ONLY);
+            auto idx = 0;
+            for(auto& t : mesh.triangles) {
+                mapping[idx++] = t[0];
+                mapping[idx++] = t[1];
+                mapping[idx++] = t[2];
+            }
+            agl::unmap(b);
+            g.indexes = std::move(b);
+        }
+        { // Normals.
+            auto b = agl::buffer();
+            agl::storage(b, size(mesh.vertices) * sizeof(agl::Vec3), GL_MAP_WRITE_BIT);
+            auto mapping = agl::map<agl::Vec3>(b, GL_WRITE_ONLY);
+            auto idx = 0;
+            for(auto& v : mesh.vertices) {
+                mapping[idx++] = v.normal;
+            }
+            agl::unmap(b);
+            g.attributes["normal3"] = AttributeBuffer{
+                .buffer = std::move(b),
+
+                .size = agl::Size<GLint>(3),
+                .stride = agl::Stride<GLsizei>(12),
+                .type = GL_FLOAT,
+            };
+        }
+        { // Positions.
+            auto b = agl::buffer();
+            agl::storage(b, size(mesh.vertices) * sizeof(agl::Vec3), GL_MAP_WRITE_BIT);
+            auto mapping = agl::map<agl::Vec3>(b, GL_WRITE_ONLY);
+            auto idx = 0;
+            for(auto& v : mesh.vertices) {
+                mapping[idx++] = v.position;
+            }
+            agl::unmap(b);
+            g.attributes["position3"] = AttributeBuffer{
+                .buffer = std::move(b),
+
+                .size = agl::Size<GLint>(3),
+                .stride = agl::Stride<GLsizei>(12),
+                .type = GL_FLOAT,
+            };
+        }
+        { // Texcoords.
+            auto b = agl::buffer();
+            agl::storage(b, size(mesh.vertices) * sizeof(agl::Vec3), GL_MAP_WRITE_BIT);
+            auto mapping = agl::map<agl::Vec3>(b, GL_WRITE_ONLY);
+            auto idx = 0;
+            for(auto& v : mesh.vertices) {
+                mapping[idx++] = v.texcoords;
+            }
+            agl::unmap(b);
+            g.attributes["texcoords3"] = AttributeBuffer{
+                .buffer = std::move(b),
+
+                .size = agl::Size<GLint>(3),
+                .stride = agl::Stride<GLsizei>(12),
+                .type = GL_FLOAT,
+            };
+        }
+        rock_geometry = std::make_shared<Geometry>(std::move(g));
+    }
+    
+
     { // Subdivided cube.
         auto object = Object();
-        object.geometry = subdivided_cube;
+        object.geometry = rock_geometry;
         object.material = phong_material;
         objects.push_back(std::move(object));
     }
 
+    // { // Subdivided cube.
+    //     auto object = Object();
+    //     object.geometry = subdivided_cube;
+    //     object.material = phong_material;
+    //     object.uniforms["model"] = agl::translation(1.f, 0.f, 0.f);
+    //     objects.push_back(std::move(object));
+    // }
 
     for(auto& o : objects) {
         auto geometry = *o.geometry;
