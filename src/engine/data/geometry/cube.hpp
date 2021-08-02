@@ -91,7 +91,13 @@ constexpr auto cube_positions = std::array{
     agl::vec3( 1,  1, 1)
 };
 
-constexpr auto cube_texcoords = cube_normals;
+const auto cube_texcoords = [](const auto& positions) {
+    auto texcoords = positions;
+    for(auto& v3 : texcoords) {
+        v3 = agl::normalize(v3);
+    }
+    return texcoords;
+}(cube_positions);
 
 inline
 auto make_cube_geometry() {
