@@ -56,33 +56,11 @@ agl::Vec3 voronoi(agl::Vec3 v) {
     return d;
 }
 
-template<typename... Types>
-struct TypeList {};
-
-using rtti_uniform_map = std::map<
-    std::type_index,
-    std::function<void(
-        agl::Program, agl::UniformIndex<GLint>, std::any)>>;
-
-template<typename Head, typename... Tail>
-rtti_uniform_map make_rtti_uniforms(TypeList<Head, Tail...>) {
-    auto t = make_rtti_uniforms(TypeList<Tail...>());
-    t[std::type_index(typeid(Head))] = [](agl::Program p, agl::UniformIndex<GLint> ui, std::any a) {
-        agl::uniform(p, ui, std::any_cast<Head>(a));
-    };
-    return t;
-}
-
-inline
-rtti_uniform_map make_rtti_uniforms(TypeList<>) {
-    return {};
-}
-
 struct Vertex {
     agl::Vec3 color;
     agl::Vec3 normal;
     agl::Vec3 position;
-    agl::Vec3 texcoords;
+    agl::Vec2 texcoords;
 };
 
 inline
@@ -167,11 +145,6 @@ int throwing_main() {
     }
 
     auto objects = std::deque<Object>();
-
-    const auto rtti_to_uniform = make_rtti_uniforms(TypeList<
-        agl::Mat4,
-        agl::Vec3,
-        agl::Vec4>());
 
     auto cube_geometry = std::make_shared<Geometry>(
         make_cube_geometry());
@@ -259,7 +232,7 @@ int throwing_main() {
         }
 
         auto g = Geometry();
-        g.primitive_count = agl::Count<GLsizei>(3 * size(mesh.triangles));
+        g.primitive_count = agl::Count<GLsizei>(GLsizei(3 * size(mesh.triangles)));
         { // Colors.
             auto b = agl::buffer();
             agl::storage(b, size(mesh.vertices) * sizeof(agl::Vec3), GL_MAP_WRITE_BIT);
@@ -327,17 +300,17 @@ int throwing_main() {
         { // Texcoords.
             auto b = agl::buffer();
             agl::storage(b, size(mesh.vertices) * sizeof(agl::Vec3), GL_MAP_WRITE_BIT);
-            auto mapping = agl::map<agl::Vec3>(b, GL_WRITE_ONLY);
+            auto mapping = agl::map<agl::Vec2>(b, GL_WRITE_ONLY);
             auto idx = 0;
             for(auto& v : mesh.vertices) {
                 mapping[idx++] = v.texcoords;
             }
             agl::unmap(b);
-            g.attributes["texcoords3"] = AttributeBuffer{
+            g.attributes["texcoords2"] = AttributeBuffer{
                 .buffer = std::move(b),
 
-                .size = agl::Size<GLint>(3),
-                .stride = agl::Stride<GLsizei>(12),
+                .size = agl::Size<GLint>(2),
+                .stride = agl::Stride<GLsizei>(8),
                 .type = GL_FLOAT,
             };
         }
@@ -349,40 +322,84 @@ int throwing_main() {
         auto object = Object();
         object.geometry = rock_geometry;
         object.material = phong_material;
+        object.uniforms["albedo_texture"] = 0;
         objects.push_back(std::move(object));
     }
+    auto& rock = objects.back();
 
-    // { // Subdivided cube.
-    //     auto object = Object();
-    //     object.geometry = subdivided_cube;
-    //     object.material = phong_material;
-    //     object.uniforms["model"] = agl::translation(1.f, 0.f, 0.f);
-    //     objects.push_back(std::move(object));
-    // }
+    auto baking_material = std::shared_ptr<Material>();
+    {
+        auto material = Material();
+        { // Program.
+            auto& p = material.program;
+            auto shaders = std::map<agl::ShaderType, std::string>{
+                {
+                    agl::ShaderType::vertex,
+                    file(root + "src/shader/rock/bake_texture.vs")
+                },
+                {
+                    agl::ShaderType::fragment,
+                    file(root + "src/shader/rock/bake_texture.fs")
+                },
+            };
+            for(auto& [type, src] : shaders) {
+                auto s = agl::shader(type);
+                agl::source(s, src);
+                agl::compile(s);
+                agl::attach(p, s);
+                agl::delete_(s);
+            }
+            agl::link(p);
+        }
+        baking_material = std::make_shared<Material>(std::move(material));
+    }
+
+    auto rock_texture = agl::Texture();
+    // while(!glfwWindowShouldClose(window)) {
+    {
+        auto size = 1024;
+        {
+            rock_texture = agl::texture(agl::TextureTarget::_2d);
+            agl::storage(rock_texture, 1, GL_RGB8, agl::Width(size), agl::Height(size));
+            agl::parameter(rock_texture, agl::TextureParameter::mag_filter, GL_LINEAR);
+            agl::parameter(rock_texture, agl::TextureParameter::min_filter, GL_LINEAR);
+
+            agl::parameter(rock_texture, agl::TextureParameter::wrap_s, GL_MIRRORED_REPEAT);
+            agl::parameter(rock_texture, agl::TextureParameter::wrap_t, GL_MIRRORED_REPEAT);
+        }
+        {
+            auto fb = agl::framebuffer();
+            {
+                agl::texture(fb, agl::TextureAttachment::color0, rock_texture);
+                agl::draw_buffer(fb, agl::FramebufferBuffer::color0);
+            }
+            {
+                glViewport(0, 0, size, size);
+                agl::bind(agl::FramebufferTarget::framebuffer, fb);
+
+                auto o = Object();
+                o.geometry = rock_geometry;
+                o.material = baking_material;
+
+                glClearColor(1.f, 1.f, 1.f, 1.f);
+                glClear(GL_COLOR_BUFFER_BIT);
+
+                configure(o);
+                render(o);
+            }
+        }
+        // glfwSwapBuffers(window);
+        // glfwPollEvents();
+    }
 
     for(auto& o : objects) {
-        auto geometry = *o.geometry;
-        auto program = o.material->program;
+        configure(o);
+    }
 
-        auto va = o.vertex_array;
-
-        if(geometry.indexes) {
-            element_buffer(va, *geometry.indexes);
-        }
-        for(int i = 0; i < agl::active_attributes(program); ++i) {
-            auto ai = agl::AttributeIndex(i);
-            auto aa = agl::active_attrib(program, ai);
-            auto attribute = geometry.attributes.at(aa.name);
-
-            auto bi = agl::BindingIndex<GLuint>(i);
-
-            attribute_binding(va, ai, bi);
-            attribute_format(va, ai,
-                attribute.size, attribute.type);
-            vertex_buffer(va, bi,
-               attribute.buffer, attribute.offset, attribute.stride);
-            enable(va, ai);
-        }
+    {
+        agl::use(phong_material->program);
+        agl::uniform(phong_material->program, agl::uniform_location(phong_material->program, "albedo_texture"), 0);
+        agl::bind_unit(0, rock_texture);
     }
 
     auto view = View();
@@ -393,7 +410,9 @@ int throwing_main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     while(!glfwWindowShouldClose(window)) {
+        agl::bind_default(agl::FramebufferTarget::framebuffer);
         glViewport(0, 0, 1280, 720);
+        glClearColor(0.f, 0.f, 0.f, 1.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         {
@@ -415,20 +434,7 @@ int throwing_main() {
         }
 
         for(auto& object : objects) {
-            auto& geometry = *object.geometry;
-            auto& material = *object.material;
-
-            for(auto& p : material.parameters) {
-                p();
-            }
-            for(auto c : material.capabilities) {
-                agl::enable(c);
-            }
-
-            auto program = material.program;
-            agl::use(program);
-
-            { // Uniforms
+            { // Uniforms.
                 auto model = agl::mat4(agl::identity);
                 {
                     auto it = object.uniforms.find("model");
@@ -444,37 +450,8 @@ int throwing_main() {
 
                 auto normal_transform = agl::transpose(inverse(view_transform * model));
                 object.uniforms["normal_transform"] = std::move(normal_transform);
-
-                for(int idx = 0; idx < agl::active_uniforms(program); ++idx) {
-                    auto ui = agl::UniformIndex(idx);
-                    auto info = agl::active_uniform(
-                        program, agl::UniformIndex<GLuint>(ui));
-                    auto it = object.uniforms.find(info.name);
-                    if(it != end(object.uniforms)) {
-                        auto type_idx = std::type_index(it->second.type());
-                        rtti_to_uniform.at(type_idx)(program, ui, it->second);
-                    }
-                }
             }
-            {
-                agl::bind(object.vertex_array);
-
-                if(geometry.indexes) {
-                    agl::draw_elements(
-                        geometry.draw_mode,
-                        geometry.primitive_count,
-                        agl::DrawType::unsigned_int);
-                } else {
-                    agl::draw_arrays(
-                        geometry.draw_mode,
-                        agl::Offset<GLint>(0),
-                        geometry.primitive_count);
-                }
-            }
-
-            for(auto c : material.capabilities) {
-                agl::disable(c);
-            }
+            render(object);
         }
 
         glfwSwapBuffers(window);

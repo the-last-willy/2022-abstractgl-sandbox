@@ -4,3 +4,4 @@
 #include "geometry.hpp"
 #include "material.hpp"
 #include "object.hpp"
+#include "render.hpp"

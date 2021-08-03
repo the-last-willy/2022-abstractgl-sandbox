@@ -17,7 +17,7 @@ auto make_monochrome_phong_material() {
         material.parameters.push_back([]() {
             glCullFace(GL_BACK);
             glDepthFunc(GL_LESS);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         });
     }
     { // Program.

@@ -91,13 +91,50 @@ constexpr auto cube_positions = std::array{
     agl::vec3( 1,  1, 1)
 };
 
-const auto cube_texcoords = [](const auto& positions) {
-    auto texcoords = positions;
-    for(auto& v3 : texcoords) {
-        v3 = agl::normalize(v3);
-    }
-    return texcoords;
-}(cube_positions);
+// const auto cube_texcoords = [](const auto& positions) {
+//     auto texcoords = positions;
+//     for(auto& v3 : texcoords) {
+//         v3 = agl::normalize(v3);
+//     }
+//     return texcoords;
+// }(cube_positions);
+
+constexpr auto cube_texcoords = std::array{
+    // -x
+    agl::vec2(3.f / 4.f, 1.f / 3.f),
+    agl::vec2(2.f / 4.f, 1.f / 3.f),
+    agl::vec2(3.f / 4.f, 2.f / 3.f),
+    agl::vec2(2.f / 4.f, 2.f / 3.f),
+    // +x
+    agl::vec2(0.f / 4.f, 1.f / 3.f),
+    agl::vec2(1.f / 4.f, 1.f / 3.f),
+    agl::vec2(0.f / 4.f, 2.f / 3.f),
+    agl::vec2(1.f / 4.f, 2.f / 3.f),
+    // -y
+    agl::vec2(2.f / 4.f, 0.f / 3.f),
+    agl::vec2(2.f / 4.f, 1.f / 3.f),
+    agl::vec2(1.f / 4.f, 0.f / 3.f),
+    agl::vec2(1.f / 4.f, 1.f / 3.f),
+    // +y
+    agl::vec2(2.f / 4.f, 3.f / 3.f),
+    agl::vec2(2.f / 4.f, 2.f / 3.f),
+    agl::vec2(1.f / 4.f, 3.f / 3.f),
+    agl::vec2(1.f / 4.f, 2.f / 3.f),
+    // -z
+    // agl::vec3(-1, -1, -1),
+    // agl::vec3(-1,  1, -1),
+    // agl::vec3( 1, -1, -1),
+    // agl::vec3( 1,  1, -1),
+    agl::vec2(3.f / 4.f, 1.f / 3.f),
+    agl::vec2(3.f / 4.f, 2.f / 3.f),
+    agl::vec2(4.f / 4.f, 1.f / 3.f),
+    agl::vec2(4.f / 4.f, 2.f / 3.f),
+    // +z
+    agl::vec2(2.f / 4.f, 1.f / 3.f),
+    agl::vec2(2.f / 4.f, 2.f / 3.f),
+    agl::vec2(1.f / 4.f, 1.f / 3.f),
+    agl::vec2(1.f / 4.f, 2.f / 3.f)
+};
 
 inline
 auto make_cube_geometry() {
@@ -213,7 +250,7 @@ auto make_subdivided_cube_geometry(int n) {
         };
     }
     { // 'texcoords3'
-        auto texcoords = std::vector<agl::Vec3>();
+        auto texcoords = std::vector<agl::Vec2>();
         texcoords.reserve((n * (n + 5) / 2 + 3) * 2 * 6);
         for(int t = 0; t < 2 * 6; ++t) {
             auto offset = 3 * t;
@@ -230,11 +267,11 @@ auto make_subdivided_cube_geometry(int n) {
         }
         auto b = agl::buffer();  
         agl::storage(b, std::span(texcoords));
-        geometry.attributes["texcoords3"] = {
+        geometry.attributes["texcoords2"] = {
             .buffer = std::move(b),
 
-            .size = agl::Size<GLint>(3),
-            .stride = agl::Stride<GLsizei>(3 * sizeof(GLfloat)),
+            .size = agl::Size<GLint>(2),
+            .stride = agl::Stride<GLsizei>(2 * sizeof(GLfloat)),
             .type = GL_FLOAT
         };
     }
