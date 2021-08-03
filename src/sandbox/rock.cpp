@@ -194,7 +194,7 @@ int throwing_main() {
                 .position = cube_positions[i],
                 .texcoords = cube_texcoords[i],});
         }
-        mesh = mesh::subdivided(mesh, 30);
+        mesh = mesh::subdivided(mesh, 6);
 
         // Editing.
         for(auto& v : mesh.vertices) {
@@ -322,7 +322,7 @@ int throwing_main() {
         auto object = Object();
         object.geometry = rock_geometry;
         object.material = phong_material;
-        object.uniforms["albedo_texture"] = 0;
+        object.uniforms["albedo_texture"] = std::make_unique<Uniform<int>>(0);
         objects.push_back(std::move(object));
     }
     auto& rock = objects.back();
@@ -355,7 +355,6 @@ int throwing_main() {
     }
 
     auto rock_texture = agl::Texture();
-    // while(!glfwWindowShouldClose(window)) {
     {
         auto size = 1024;
         {
@@ -388,8 +387,6 @@ int throwing_main() {
                 render(o);
             }
         }
-        // glfwSwapBuffers(window);
-        // glfwPollEvents();
     }
 
     for(auto& o : objects) {
@@ -439,17 +436,17 @@ int throwing_main() {
                 {
                     auto it = object.uniforms.find("model");
                     if(it != end(object.uniforms)) {
-                        model = std::any_cast<const agl::Mat4&>(it->second);
+                        model = dynamic_cast<const agl::Mat4&>(*it->second);
                     }
                 }
 
                 auto view_transform =  inverse(transform(view));
 
                 auto mvp = transform(proj) * view_transform * model;
-                object.uniforms["mvp"] = std::move(mvp);
+                object.uniforms["mvp"] = std::make_unique<Uniform<agl::Mat4>>(std::move(mvp));
 
                 auto normal_transform = agl::transpose(inverse(view_transform * model));
-                object.uniforms["normal_transform"] = std::move(normal_transform);
+                object.uniforms["normal_transform"] = std::make_unique<Uniform<agl::Mat4>>(std::move(normal_transform));
             }
             render(object);
         }

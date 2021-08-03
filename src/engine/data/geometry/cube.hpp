@@ -121,10 +121,6 @@ constexpr auto cube_texcoords = std::array{
     agl::vec2(1.f / 4.f, 3.f / 3.f),
     agl::vec2(1.f / 4.f, 2.f / 3.f),
     // -z
-    // agl::vec3(-1, -1, -1),
-    // agl::vec3(-1,  1, -1),
-    // agl::vec3( 1, -1, -1),
-    // agl::vec3( 1,  1, -1),
     agl::vec2(3.f / 4.f, 1.f / 3.f),
     agl::vec2(3.f / 4.f, 2.f / 3.f),
     agl::vec2(4.f / 4.f, 1.f / 3.f),

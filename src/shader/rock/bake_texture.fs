@@ -50,38 +50,51 @@ vec3 worley_noise2(vec3 v) {
 }
 
 float worley_noise_edge(vec3 v) {
-    vec3 d1 = vec3(1., 1., 1.);
-    vec3 d2 = vec3(1., 1., 1.);
+    // Minimum distance to seed vector.
+    vec3 md = vec3(1., 1., 1.);
+    // Minimum squared radius to seed.
+    float mr = 3.f;
     vec3 i = floor(v);
     for(float j = -1.; j <= 1.; j += 1.)
     for(float k = -1.; k <= 1.; k += 1.)
     for(float l = -1.; l <= 1.; l += 1.) {
         vec3 seed = i + vec3(j, k, l) + hash(i + vec3(j, k, l));
-        vec3 diff = seed - v;
-        if(dot(diff, diff) < dot(d2, d2)) {
-            d2 = diff;
-            if(dot(d2, d2) < dot(d1, d1)) {
-                vec3 tmp = d1;
-                d1 = d2;
-                d2 = tmp;
-            }
+        vec3 d = seed - v;
+        float r = dot(d, d);
+        if(r < mr) {
+            md = d;
+            mr = r;
         }
     }
-    vec3 s1 = v + d1;
-    vec3 s2 = v + d2;
-    vec3 s1s2 = normalize(s2 - s1);
-    vec3 m = (s1 + s2) / 2.;
-    vec3 mv = (v - m);
-    float d = abs(dot(mv, s1s2));
-    return d;
+    // Minimum distance seed.
+    vec3 s1 = v + md;
+    // Minimum cell coordinates.
+    vec3 mc = floor(s1);
+    // Minimum edge distance.
+    float me = 3.;
+    for(float j = -2.; j <= 2.; j += 1.)
+    for(float k = -2.; k <= 2.; k += 1.)
+    for(float l = -2.; l <= 2.; l += 1.) {
+        if(j == 0. && k == 0. && l == 0.) continue;
+        vec3 s2 = mc + vec3(j, k, l) + hash(mc + vec3(j, k, l));
+        vec3 d = s1 - v;
+        float e = (dot(v - (s1 + s2) / 2., normalize(s1 - s2)));
+        if(e < me) {
+            me = e;
+        }
+    }
+    return me;
 }
-
 
 void main() {
     // length(vertex_position3): [1, 2]
     float range = length(vertex_position3) - 1.;
     
-    // float brightness = range;
+    float brightness = range;
 
-    fragment_color = vec3(length(worley_noise_edge(3.f - vertex_position3)) / sqrt(3.) / 2. + 0.5);
+    float cracks = min(
+        smoothstep(0.01, 0.012, worley_noise_edge(vertex_position3)),
+        smoothstep(0.001, 0.012, worley_noise_edge(4. * vertex_position3)));
+
+    fragment_color = brightness * vec3(smoothstep(0.01, 0.03, worley_noise_edge(4. * vertex_position3)));
 }
