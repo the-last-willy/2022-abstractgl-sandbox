@@ -6,9 +6,9 @@ namespace mesh {
 
 // Currently no seam handling.
 // So it completely destroys connectivity.
-template<typename Vertex>
-auto subdivided(const FaceVertex<Vertex>& face_vertex, unsigned n) {
-    auto result = FaceVertex<Vertex>();
+inline
+auto subdivided(const FaceVertex& face_vertex, unsigned n) {
+    auto result = FaceVertex();
     { // Triangles.
         {
             auto factor = (n + 1) * (n + 1);

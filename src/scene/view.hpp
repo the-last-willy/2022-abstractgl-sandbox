@@ -5,8 +5,8 @@
 namespace tlw {
 
 struct View {
-	agl::Vec<GLfloat, 3> rotation_center = agl::vec3(0.f, 0.f, 0.f);
-	agl::Vec<GLfloat, 3> position = agl::vec3(0.f, 0.f, 0.f);
+	agl::Vec3 rotation_center = agl::vec3(0.f, 0.f, 0.f);
+	agl::Vec3 position = agl::vec3(0.f, 0.f, 0.f);
 
 	// Aircraft rotation.
 	float yaw = 0.f;
@@ -15,12 +15,19 @@ struct View {
 };
 
 constexpr
+auto rotation(const View& v) {
+	return agl::rotation_y(v.yaw)
+	* agl::rotation_x(v.pitch)
+	* agl::rotation_z(v.roll);
+}
+
+constexpr
 auto transform(const View& v) {
 	return agl::translation(v.position)
-		* agl::rotation_y(v.yaw)
-		* agl::rotation_x(v.pitch)
-		* agl::rotation_z(v.roll)
-		* agl::translation(v.rotation_center);
+	* agl::rotation_y(v.yaw)
+	* agl::rotation_x(v.pitch)
+	* agl::rotation_z(v.roll)
+	* agl::translation(v.rotation_center);
 }
 
 }

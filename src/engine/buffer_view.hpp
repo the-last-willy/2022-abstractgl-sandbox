@@ -2,7 +2,9 @@
 
 #include <agl/all.hpp>
 
-struct AttributeBuffer {
+namespace eng {
+
+struct BufferView {
     agl::Buffer buffer = agl::buffer();
 
     agl::Offset<GLintptr> offset = agl::Offset<GLintptr>(0);
@@ -10,3 +12,5 @@ struct AttributeBuffer {
     agl::Stride<GLsizei> stride = agl::Stride<GLsizei>(0);
     GLenum type = 0;
 };
+
+}
