@@ -1,5 +1,7 @@
 #pragma once
 
+#include "material.hpp"
+#include "primitive.hpp"
 #include "uniform.hpp"
 
 #include <agl/all.hpp>
@@ -7,17 +9,10 @@
 #include <deque>
 #include <map>
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace eng {
-
-struct Primitive {
-    agl::DrawMode draw_mode = agl::DrawMode::triangles;
-    agl::DrawType draw_type;
-    // std::size_t material = 0;
-    agl::Count<GLsizei> primitive_count = agl::Count<GLsizei>(0);
-    agl::VertexArray vertex_array = {};
-};
 
 struct Database {
     // OpenGL resources.
@@ -32,7 +27,7 @@ struct Database {
 
     // std::vector<agl::Sampler> sampler = {};
 
-    std::map<std::size_t, agl::Texture> gl_textures = {};
+    std::deque<agl::Texture> gl_textures = {};
 
     // Need to be bound before rendering.
     // Need to know number of primitives.
@@ -42,6 +37,7 @@ struct Database {
     ////////////////////////////////////////////////////////////////////////////
     // Objects.
 
+    std::deque<Material> materials = {};
     // Material:
         // Texture
 

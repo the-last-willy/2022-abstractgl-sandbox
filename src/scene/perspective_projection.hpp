@@ -16,7 +16,7 @@ auto transform(const PerspectiveProjection& p) {
 	// View space -> Clip space
 	// (near, far) -> (-near, far)
 
-	// TODO: THIS IS THE INVERSE YOU STUPID'
+	// TODO: THIS IS THE INVERSE YOU STUPID
 	// YOU WROTE IT YOUSELF
 	// A LINE IS A COLUMN
 	// FIX THAT !!!!!!!

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "data/all.hpp"
-#include "geometry.hpp"
+#include "database.hpp"
 #include "material.hpp"
-#include "object.hpp"
+

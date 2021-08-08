@@ -5,7 +5,7 @@
 struct AnyUniform {
     virtual ~AnyUniform() = default;
 
-    virtual void set(agl::Program, agl::UniformIndex<GLint>) const = 0;
+    virtual void set(agl::Program, agl::UniformIndex) const = 0;
 };
 
 template<typename Value>
@@ -17,7 +17,7 @@ struct Uniform : AnyUniform {
         : value(std::move(v))
     {}
 
-    void set(agl::Program p, agl::UniformIndex<GLint> ui) const override {
+    void set(agl::Program p, agl::UniformIndex ui) const override {
         agl::uniform(p, ui, value);
     }
 };

@@ -1,6 +1,6 @@
 // Local headers.
 
-#include "engine/database.hpp"
+#include "engine/all.hpp"
 #include "program/all.hpp"
 #include "scene/all.hpp"
 #include "file.hpp"
@@ -27,45 +27,85 @@
 
 //
 
-agl::Program gltf_program = {};
+eng::Material gltf_normal_mapping_material = {};
+eng::Material gltf_no_normal_mapping_material = {};
 
 void fill(eng::Database& database, tinygltf::Model& model) {
-    // auto buffer_mapping = std::map<int, agl::Buffer>();
-    // { // Converting buffers.
-    //     for(std::size_t i = 0; i < size(model.buffers); ++i) {
-    //         auto b = agl::buffer();
-    //         agl::storage(b, std::span(model.buffers[i].data));
-    //         buffer_mapping[static_cast<int>(i)] = b;
-    //         database.gl_buffers[i] = b;
-    //     }
-        
-    // }
-    auto buffer_view_mapping = std::map<int, agl::Buffer>();
-    {
-        // Exploding attribute buffers.
-        for(auto& mesh : model.meshes)
-        for(auto& primitive : mesh.primitives)
-        for(auto [name, accessor_id] : primitive.attributes) {
-            auto& buffer_view_id = model.accessors[accessor_id].bufferView;
-            auto& buffer_view = model.bufferViews[buffer_view_id];
-            auto& buffer = model.buffers[buffer_view.buffer];
-            auto b = agl::buffer();
-            auto ss = std::span(buffer.data).subspan(
-                buffer_view.byteOffset, buffer_view.byteLength);
-            agl::storage(b, ss);
-            buffer_view_mapping[buffer_view_id] = b;
+    auto buffer_mapping = std::map<int, agl::Buffer>();
+    { // Converting buffers.
+        for(std::size_t i = 0; i < size(model.buffers); ++i) {
+            auto b = agl::create(agl::buffer_tag);
+            agl::storage(b, std::span(model.buffers[i].data));
+            buffer_mapping[static_cast<int>(i)] = b;
+            database.gl_buffers[i] = b;
         }
-        // Exploding index buffers.
-        for(auto& mesh : model.meshes)
-        for(auto& primitive : mesh.primitives) {
-            auto indices = primitive.indices;
-            auto& buffer_view = model.bufferViews[model.accessors[indices].bufferView];
-            auto& buffer = model.buffers[buffer_view.buffer];
-            auto b = agl::buffer();
-            auto ss = std::span(buffer.data).subspan(
-                buffer_view.byteOffset, buffer_view.byteLength);
-            agl::storage(b, ss);
-            buffer_view_mapping[indices] = b;
+        
+    }
+    auto image_mapping = std::map<int, agl::Texture>();
+    { // Converting images into gl textures.
+        for(std::size_t i = 0; i < size(model.images); ++i) {
+            auto& image = model.images[i];
+            auto t = agl::texture(agl::TextureTarget::_2d);
+            mag_filter(t, GL_LINEAR);
+            min_filter(t, GL_LINEAR);
+            if(image.component == 3 && image.bits == 8) {
+                agl::storage(
+                    t, GL_RGB8,
+                    agl::Width(image.width), agl::Height(image.height));
+                agl::image(
+                    t, agl::Width(image.width), agl::Height(image.height),
+                    GL_RGB, GL_UNSIGNED_BYTE,
+                    std::as_bytes(std::span(image.image)));
+            } else if(image.component == 4 && image.bits == 8) {
+                agl::storage(
+                    t, GL_RGBA8,
+                    agl::Width(image.width), agl::Height(image.height));
+                agl::image(
+                    t, agl::Width(image.width), agl::Height(image.height),
+                    GL_RGBA, GL_UNSIGNED_BYTE,
+                    std::as_bytes(std::span(image.image)));
+                glFlush();
+            } else {
+                throw std::runtime_error("Invalid texture format.");
+            }
+            image_mapping[static_cast<int>(i)] = t;
+            database.gl_textures.push_back(t);
+        }
+    }
+    auto texture_mapping = std::map<int, agl::Texture>();
+    { // Converting textures.
+        for(std::size_t i = 0; i < size(model.textures); ++i) {
+            auto& texture = model.textures[i];
+            texture_mapping[static_cast<int>(i)]
+            = image_mapping.at(texture.source);
+        }
+    }
+    auto material_mapping = std::map<int, eng::Material*>();
+    { // Converting materials.
+        for(std::size_t i = 0; i < size(model.materials); ++i) {
+            auto& material = model.materials[i];
+            auto eng_material = gltf_no_normal_mapping_material;
+            { // 'pbrMetallicRoughness'.
+                auto& pbrMetallicRoughness = material.pbrMetallicRoughness;  
+                { // 'baseColorTexture'.
+                    auto& baseColorTexture = pbrMetallicRoughness.baseColorTexture;
+                    if(baseColorTexture.index != -1) {
+                        eng_material.textures.push_back(std::make_tuple(
+                            std::string("baseColorTexture"),
+                            texture_mapping.at(baseColorTexture.index)));
+                    }
+                }
+            }
+            { // 'normalTexture'.
+                auto& normalTexture = material.normalTexture;  
+                if(normalTexture.index != -1) {
+                    eng_material.textures.push_back(std::make_tuple(
+                            std::string("normalTexture"),
+                            texture_mapping.at(normalTexture.index)));
+                }
+            }
+            database.materials.push_back(std::move(eng_material));
+            material_mapping[static_cast<int>(i)] = &database.materials.back();
         }
     }
     { // Converting primitives.
@@ -78,16 +118,22 @@ void fill(eng::Database& database, tinygltf::Model& model) {
             auto gl_vertex_array = p.vertex_array = agl::vertex_array();
             { // Indices.
                 auto& accessor = model.accessors[primitive.indices];
+                auto& buffer_view = model.bufferViews[accessor.bufferView];
                 p.draw_type = static_cast<agl::DrawType>(accessor.componentType);
+                p.offset = buffer_view.byteOffset;
                 p.primitive_count = agl::Count<GLsizei>(
                     static_cast<GLsizei>(accessor.count));
                 agl::element_buffer(
                     gl_vertex_array,
-                    buffer_view_mapping.at(accessor.bufferView));
+                    buffer_mapping.at(buffer_view.buffer));
             }
-            for(int i = 0; i < agl::active_attributes(gltf_program); ++i) {
+            auto& material = *(p.material = material_mapping.at(primitive.material));
+            if(primitive.attributes.find("TANGENT") != end(primitive.attributes)) {
+                material.program = gltf_normal_mapping_material.program;
+            }
+            for(int i = 0; i < agl::active_attributes(material.program.program); ++i) {
                 auto ai = agl::AttributeIndex(i);
-                auto aa = agl::active_attrib(gltf_program, ai);
+                auto aa = agl::active_attrib(material.program.program, ai);
                 auto bi = agl::BindingIndex<GLuint>(i);
                 attribute_binding(gl_vertex_array, ai, bi);
 
@@ -132,8 +178,8 @@ void fill(eng::Database& database, tinygltf::Model& model) {
                         stride = agl::Stride<GLsizei>(size.value * component_byte_size);
                     }
                     vertex_buffer(gl_vertex_array, bi,
-                            buffer_view_mapping[accessor.bufferView], 
-                            agl::Offset<GLintptr>(0),
+                            buffer_mapping[buffer_view.buffer], 
+                            agl::Offset<GLintptr>(buffer_view.byteOffset),
                             stride);
                     enable(gl_vertex_array, ai);
                 } else {
@@ -141,34 +187,6 @@ void fill(eng::Database& database, tinygltf::Model& model) {
                 }
             }
             database.primitives.push_back(std::move(p));
-        }
-    }
-    auto image_mapping = std::map<int, std::size_t>();
-    { // Converting images.
-        for(std::size_t i = 0; i < size(model.images); ++i) {
-            auto& image = model.images[i];
-            auto t = agl::texture(agl::TextureTarget::_2d);
-            if(image.component == 3 && image.bits == 8) {
-                agl::storage(
-                    t, GL_RGB8,
-                    agl::Width(image.width), agl::Height(image.height));
-                agl::image(
-                    t, agl::Width(0), agl::Height(0),
-                    GL_RGB, GL_UNSIGNED_BYTE,
-                    std::as_bytes(std::span(image.image)));
-            } else if(image.component == 4 && image.bits == 8) {
-                agl::storage(
-                    t, GL_RGBA8,
-                    agl::Width(image.width), agl::Height(image.height));
-                agl::image(
-                    t, agl::Width(0), agl::Height(0),
-                    GL_RGBA, GL_UNSIGNED_BYTE,
-                    std::as_bytes(std::span(image.image)));
-            } else {
-                throw std::runtime_error("Invalid texture format.");
-            }
-            image_mapping[static_cast<int>(i)] = i;
-            database.gl_textures[i] = std::move(t);
         }
     }
     // auto texture_mapping = std::map<int, std::size_t>();
@@ -214,25 +232,42 @@ struct GltfProgram : Program {
     
     void init() override {
         { // Loading glTF rendering material.
-            gltf_program = agl::program();
-            auto shaders = std::map<agl::ShaderType, std::string>{
-                {
-                    agl::ShaderType::vertex,
-                    file(tlw::root + "src/shader/gltf/normal.vs")
-                },
-                {
-                    agl::ShaderType::fragment,
-                    file(tlw::root + "src/shader/gltf/normal.fs")
-                },
-            };
-            for(auto& [type, src] : shaders) {
-                auto s = agl::shader(type);
-                agl::source(s, src);
-                agl::compile(s);
-                agl::attach(gltf_program, s);
-                agl::delete_(s);
+            {  // No normal mapping.
+                load(gltf_no_normal_mapping_material.program, {
+                    {
+                        agl::ShaderType::vertex,
+                        file(tlw::root + "src/shader/gltf/phong.vs")
+                    },
+                    {
+                        agl::ShaderType::fragment,
+                        file(tlw::root + "src/shader/gltf/phong.fs")
+                    }});
+                gltf_no_normal_mapping_material.program.capabilities = {
+                    agl::Capability::cull_face,
+                    agl::Capability::depth_test};
+                gltf_no_normal_mapping_material.on_enter = []() {
+                    glDepthFunc(GL_LESS);
+                    glCullFace(GL_FRONT);
+                };
             }
-            agl::link(gltf_program);
+            { // Normal mapping.
+                load(gltf_normal_mapping_material.program, {
+                    {
+                        agl::ShaderType::vertex,
+                        file(tlw::root + "src/shader/gltf/phong_normal_mapping.vs")
+                    },
+                    {
+                        agl::ShaderType::fragment,
+                        file(tlw::root + "src/shader/gltf/phong_normal_mapping.fs")
+                    }});
+                gltf_normal_mapping_material.program.capabilities = {
+                    agl::Capability::cull_face,
+                    agl::Capability::depth_test};
+                gltf_normal_mapping_material.on_enter = []() {
+                    glDepthFunc(GL_LESS);
+                    glCullFace(GL_FRONT);
+                };
+            }
         }
 
         tinygltf::TinyGLTF loader;
@@ -244,7 +279,6 @@ struct GltfProgram : Program {
         bool ret = loader.LoadASCIIFromFile(
             &model, &err, &warn, 
             "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
-            // "D:/data/sample/gltf2/box/Box/glTF/Box.gltf"
             );
 
         if (!warn.empty()) {
@@ -288,36 +322,27 @@ struct GltfProgram : Program {
     void render() override {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glCullFace(GL_FRONT);
-        agl::enable(agl::Capability::cull_face);
-        glDepthFunc(GL_LESS);
-        agl::enable(agl::Capability::depth_test);
-
         auto inv_v = transform(view);
         auto v = inverse(inv_v);
 
         auto mvp = transform(proj) * v * agl::scaling3(0.1f);
         auto normal_transform = transpose(inv_v);
 
-        agl::use(gltf_program);
-
-        agl::uniform(
-            gltf_program,
-            agl::uniform_location(gltf_program, "mvp"),
-            mvp);
-        agl::uniform(
-            gltf_program,
-            agl::uniform_location(gltf_program, "normal_transform"),
-            normal_transform);
-
         for(auto& p : database.primitives) {
-            agl::bind(p.vertex_array);
-            if(agl::element_array_buffer_binding(p.vertex_array)) {
-                agl::draw_elements(
-                    p.draw_mode,
-                    p.primitive_count,
-                    p.draw_type);
-            }
+            bind(p);
+
+            agl::uniform(
+                p.material->program.program,
+                *agl::uniform_location(p.material->program.program, "mvp"),
+                mvp);
+            agl::uniform(
+                p.material->program.program,
+                *agl::uniform_location(p.material->program.program, "normal_transform"),
+                normal_transform);
+
+            eng::render(p);
+
+            unbind(p);
         }
     }
 };
