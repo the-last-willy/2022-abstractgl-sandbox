@@ -21,6 +21,7 @@ target_include_directories(common
 INTERFACE
     libs/stb
     libs/tiny_obj_loader-1.0.7
+    libs/tinygltf
     src
 )
 
@@ -30,10 +31,20 @@ INTERFACE
     glfw
 )
 
+# Executable 'gltf'
+
+add_executable(gltf src/sandbox/gltf.cpp)
+target_link_libraries(gltf PRIVATE common)
+
 # Executable 'lsystem'
 
 add_executable(lsystem src/sandbox/lsystem.cpp)
 target_link_libraries(lsystem PRIVATE common)
+
+# Executable 'rock'
+
+add_executable(rock src/sandbox/rock.cpp)
+target_link_libraries(rock PRIVATE common)
 
 # Executable 'terrain'
 

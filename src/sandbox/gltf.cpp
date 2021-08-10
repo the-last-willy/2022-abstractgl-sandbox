@@ -1,3 +1,10 @@
+// Definitions.
+
+#define GLFW_INCLUDE_NONE
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
+
 // Local headers.
 
 #include "engine/all.hpp"
@@ -6,20 +13,11 @@
 #include "file.hpp"
 #include "root.hpp"
 
-// glfw
+// External libraries.
 
 #include <glad/glad.h>
-
-#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-
-// tinygltf
-// https://github.com/syoyo/tinygltf
-
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "tiny_gltf.h"
+#include <tiny_gltf.h>
 
 // Standard library.
 
@@ -45,29 +43,34 @@ void fill(eng::Database& database, tinygltf::Model& model) {
     { // Converting images into gl textures.
         for(std::size_t i = 0; i < size(model.images); ++i) {
             auto& image = model.images[i];
-            auto t = agl::texture(agl::TextureTarget::_2d);
+            auto t = agl::create(agl::TextureTarget::_2d);
             mag_filter(t, GL_LINEAR);
-            min_filter(t, GL_LINEAR);
+            min_filter(t, GL_LINEAR_MIPMAP_LINEAR);
+            GLenum base_internal_format = 0;
+            GLenum pixel_data_type = 0;
+            GLenum sized_internal_format = 0;
             if(image.component == 3 && image.bits == 8) {
-                agl::storage(
-                    t, GL_RGB8,
-                    agl::Width(image.width), agl::Height(image.height));
-                agl::image(
-                    t, agl::Width(image.width), agl::Height(image.height),
-                    GL_RGB, GL_UNSIGNED_BYTE,
-                    std::as_bytes(std::span(image.image)));
+                base_internal_format = GL_RGB;
+                pixel_data_type = GL_UNSIGNED_BYTE;
+                sized_internal_format = GL_RGB8;
             } else if(image.component == 4 && image.bits == 8) {
-                agl::storage(
-                    t, GL_RGBA8,
-                    agl::Width(image.width), agl::Height(image.height));
-                agl::image(
-                    t, agl::Width(image.width), agl::Height(image.height),
-                    GL_RGBA, GL_UNSIGNED_BYTE,
-                    std::as_bytes(std::span(image.image)));
-                glFlush();
+                base_internal_format = GL_RGBA;
+                pixel_data_type = GL_UNSIGNED_BYTE;
+                sized_internal_format = GL_RGBA8;
             } else {
                 throw std::runtime_error("Invalid texture format.");
             }
+            auto level_count = static_cast<GLsizei>(
+                std::floor(std::log2(std::max(image.height, image.width))) + 1);
+            agl::storage(
+                    t, level_count, sized_internal_format,
+                    agl::Width(image.width), agl::Height(image.height));
+            agl::image(
+                t, agl::Width(image.width), agl::Height(image.height),
+                base_internal_format, pixel_data_type,
+                std::as_bytes(std::span(image.image)));
+            agl::generate_mipmap(t);
+            glFlush();
             image_mapping[static_cast<int>(i)] = t;
             database.gl_textures.push_back(t);
         }
@@ -189,45 +192,20 @@ void fill(eng::Database& database, tinygltf::Model& model) {
             database.primitives.push_back(std::move(p));
         }
     }
-    // auto texture_mapping = std::map<int, std::size_t>();
-    // { // Converting textures.
-    //     for(std::size_t i = 0; i < size(model.buffers); ++i) {
-    //         auto b = agl::buffer();
-    //         agl::storage(b, std::span(model.buffers[i]));
-    //         buffer_mapping[i] = size(database.buffers);
-    //         database.buffers[i] = std::move(b);
-    //     }
-    // }
-    // auto material_mapping = std::map<int, std::size_t>();
-    // { // Converting materials.
-    //     for(std::size_t i = 0; i < size(model.buffers); ++i) {
-    //         auto b = agl::buffer();
-    //         agl::storage(b, std::span(model.buffers[i]));
-    //         buffer_mapping[i] = size(database.buffers);
-    //         database.buffers[i] = std::move(b);
-    //     }
-    // }
-    // auto primitive_mapping = std::map<int, std::size_t>();
-    // { // Converting primitives.
-    //     for(std::size_t i = 0; i < size(model.primitives); ++i) {
-    //         auto b = agl::buffer();
-    //         agl::storage(b, std::span(model.buffers[i]));
-    //         { // 
-
-    //         }
-    //         {
-
-    //         }
-    //         buffer_mapping[i] = size(database.buffers);
-    //         database.buffers[i] = std::move(b);
-    //     }
-    // }
 }
 
 struct GltfProgram : Program {
     eng::Database database = {};
 
-    tlw::PerspectiveProjection proj = {};
+    agl::Framebuffer g_buffer = {};
+    agl::Texture albedo_texture = {};
+    agl::Texture depth_texture = {};
+    agl::Texture normal_texture = {};
+    agl::Texture position_texture = {};
+
+    eng::Material albedo_material = {};
+
+    tlw::PerspectiveProjection pproj = {};
     tlw::View view = {};
     
     void init() override {
@@ -269,6 +247,19 @@ struct GltfProgram : Program {
                 };
             }
         }
+        { // Loading albedo material.
+            load(albedo_material.program, {
+                {
+                    agl::ShaderType::vertex,
+                    file(tlw::root + "src/shader/gltf/deferred/albedo.vs")
+                },
+                {
+                    agl::ShaderType::fragment,
+                    file(tlw::root + "src/shader/gltf/deferred/albedo.fs")
+                }});
+            albedo_material.textures.push_back(
+                {"albedo_texture", albedo_texture});
+        }
 
         tinygltf::TinyGLTF loader;
         tinygltf::Model model;
@@ -296,6 +287,51 @@ struct GltfProgram : Program {
 
         fill(database, model);
 
+        { // GBuffer.
+            g_buffer = agl::framebuffer();
+            { // Albedo texture.
+                albedo_texture = create(agl::TextureTarget::rectangle);
+                storage(
+                    albedo_texture, GL_RGB32F,
+                    agl::Width(1080), agl::Height(720));
+                texture(g_buffer,
+                    agl::color_attachment(0),
+                    albedo_texture);
+            }
+            { // Depth texture.
+                depth_texture = create(agl::TextureTarget::rectangle);
+                storage(
+                    depth_texture, GL_DEPTH_COMPONENT32F,
+                    agl::Width(1080), agl::Height(720));
+                texture(g_buffer,
+                    agl::TextureAttachment::depth,
+                    depth_texture);
+            }
+            { // Normal texture.
+                normal_texture = create(agl::TextureTarget::rectangle);
+                storage(
+                    normal_texture, GL_RGB32F,
+                    agl::Width(1080), agl::Height(720));
+                texture(g_buffer,
+                    agl::color_attachment(1),
+                    normal_texture);
+            }
+            { // Position texture. 
+                position_texture = create(agl::TextureTarget::rectangle);
+                storage(
+                    position_texture, GL_RGB32F,
+                    agl::Width(1080), agl::Height(720));
+                texture(g_buffer,
+                    agl::color_attachment(2),
+                    position_texture);
+            }
+            auto bs = std::array{
+                agl::FramebufferBuffer::color0,
+                agl::FramebufferBuffer::color1,
+                agl::FramebufferBuffer::color2};
+            draw_buffers(g_buffer, std::span(bs));
+        }
+
         glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
@@ -320,12 +356,13 @@ struct GltfProgram : Program {
     }
 
     void render() override {
+        // bind(agl::FramebufferTarget::framebuffer, g_buffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         auto inv_v = transform(view);
         auto v = inverse(inv_v);
 
-        auto mvp = transform(proj) * v * agl::scaling3(0.1f);
+        auto mvp = transform(pproj) * v * agl::scaling3(0.1f);
         auto normal_transform = transpose(inv_v);
 
         for(auto& p : database.primitives) {
@@ -344,6 +381,14 @@ struct GltfProgram : Program {
 
             unbind(p);
         }
+
+        // bind_default(agl::FramebufferTarget::framebuffer);
+        // bind(albedo_material);
+
+        // draw_arrays(
+        //     agl::DrawMode::triangles,
+        //     agl::Offset<GLint>(0),
+        //     agl::Count<GLsizei>(3));
     }
 };
 

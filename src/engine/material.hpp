@@ -28,7 +28,7 @@ void bind_textures(const Material& m) {
             agl::uniform(m.program.program, *ul, unit);
             unit += 1;
         } else {
-            std::cout << uniform << std::endl;
+            // std::cout << uniform << std::endl;
         }
     }
 }

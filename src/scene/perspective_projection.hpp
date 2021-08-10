@@ -1,4 +1,4 @@
-#pragma
+#pragma once
 
 #include "agl/all.hpp"
 
@@ -16,10 +16,6 @@ auto transform(const PerspectiveProjection& p) {
 	// View space -> Clip space
 	// (near, far) -> (-near, far)
 
-	// TODO: THIS IS THE INVERSE YOU STUPID
-	// YOU WROTE IT YOUSELF
-	// A LINE IS A COLUMN
-	// FIX THAT !!!!!!!
 	// | 1 | 0 | 0 | 0 | = x
 	// | 0 | 1 | 0 | 0 | = y
 	// | 0 | 0 | a | b | -> (-near, far)
