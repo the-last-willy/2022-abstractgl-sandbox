@@ -2,10 +2,10 @@
 
 uniform sampler2D albedo_texture;
 
-in vec2 vertex_texccords;
+in vec2 vertex_texcoords;
 
-out vec4 fragment_rgba;
+out vec3 fragment_rgb;
 
 void main() {
-    fragment_rgba = texture(albedo_texture, vertex_texccords);
+    fragment_rgb = texture(albedo_texture, vertex_texcoords).rgb;
 }

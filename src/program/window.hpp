@@ -34,6 +34,9 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 struct Window {
     GLFWwindow* window;
 
+    int width_ = 1'280;
+    int height_ = 720;
+
     Window() {
         glfwSetErrorCallback(error_callback);
  
@@ -46,7 +49,7 @@ struct Window {
         glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     
-        window = glfwCreateWindow(1280, 720, "Procedural Terrain Generation", NULL, NULL);
+        window = glfwCreateWindow(width_, height_, "OpenGL", NULL, NULL);
         if (!window) {
             glfwTerminate();
             exit(EXIT_FAILURE);
@@ -74,7 +77,15 @@ struct Window {
             glDebugMessageCallback(&error_callback, NULL);
         }
         
-        glEnable(GL_MULTISAMPLE);
+        // glEnable(GL_MULTISAMPLE);
     }
 
+
+    auto width() const {
+        return width_;
+    }
+
+    auto height() const {
+        return height_;
+    }
 };

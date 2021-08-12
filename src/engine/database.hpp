@@ -61,6 +61,19 @@ struct Database {
     // std::map<MeshId, std::map<std::string, AnyUniform>> material_uniforms = {};
 
     // std::map<MeshId, std::map<std::string, AnyUniform>> mesh_uniforms = {};
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Defaults.
+
+
+
+    Material default_material = {};
+
+    // Textures.
+    agl::Texture default_albedo_map = {};
+    agl::Texture default_normal_map = {};
+
+    agl::VertexArray empty_vertex_array = agl::vertex_array();
 };
 
 }

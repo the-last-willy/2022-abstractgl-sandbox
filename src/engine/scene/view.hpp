@@ -8,6 +8,8 @@ struct View {
 	agl::Vec3 rotation_center = agl::vec3(0.f, 0.f, 0.f);
 	agl::Vec3 position = agl::vec3(0.f, 0.f, 0.f);
 
+	float zoom = 1.f;
+
 	// Aircraft rotation.
 	float yaw = 0.f;
 	float pitch = 0.f;
@@ -24,6 +26,7 @@ auto rotation(const View& v) {
 constexpr
 auto transform(const View& v) {
 	return agl::translation(v.position)
+	* agl::scaling3(v.zoom)
 	* agl::rotation_y(v.yaw)
 	* agl::rotation_x(v.pitch)
 	* agl::rotation_z(v.roll)
