@@ -36,7 +36,7 @@ void main() {
 
     // Light NDC space.
     float shadow_depth = texture(shadow_map, light_position.xy)[0];
-    float shadow_bias = .003;
+    float shadow_bias = .00;
     bool shadow = shadow_depth + shadow_bias < light_position.z;
 
     fragment_rgb = shadow ? vec3(0.) : .7 * diffuse + .5 * specular;

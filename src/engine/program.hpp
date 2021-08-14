@@ -1,14 +1,17 @@
 #pragma once
 
+#include "capability.hpp"
+
 #include <agl/all.hpp>
 
+#include <iostream>
 #include <vector>
 #include <map>
 
 namespace eng {
 
 struct Program {
-    std::vector<agl::Capability> capabilities = {};
+    std::vector<Capability> capabilities = {};
     agl::Program program = {};
 };
 
@@ -41,6 +44,17 @@ void unbind(const Program& p) {
     for(auto c : p.capabilities) {
         disable(c);
     }
+}
+
+template<typename Type>
+void uniform(const Program& p, agl::czstring name, const Type& t) {
+    auto ul = uniform_location(p.program, name);
+    if(ul) {
+        agl::uniform(p.program, *ul, t);
+    } else {
+        // std::cerr << "No uniform named " << name << "." << std::endl;
+    }
+    
 }
 
 }

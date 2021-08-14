@@ -68,12 +68,9 @@ void fill(eng::Database& database, tinygltf::Model& model) {
             auto eng_material = database.default_material;
             { // 'doubleSided'.
                 if(!material.doubleSided) {
-                    eng_material.program.capabilities.push_back(agl::Capability::cull_face);
-                    auto f = eng_material.on_enter;
-                    eng_material.on_enter = [f = eng_material.on_enter]() {
-                        f();
-                        glCullFace(GL_FRONT);
-                    };
+                    eng_material.program.capabilities.push_back({
+                        agl::Capability::cull_face, []() {
+                            glCullFace(GL_FRONT); }});
                 }
             }
             { // 'pbrMetallicRoughness'.
@@ -81,26 +78,26 @@ void fill(eng::Database& database, tinygltf::Model& model) {
                 { // 'baseColorTexture'.
                     auto& baseColorTexture = pbrMetallicRoughness.baseColorTexture;
                     if(baseColorTexture.index != -1) {
-                        eng_material.textures.push_back(std::make_tuple(
-                            std::string("baseColorTexture"),
-                            texture_mapping.at(baseColorTexture.index)));
+                        eng_material.textures.emplace(
+                            "baseColorTexture",
+                            texture_mapping.at(baseColorTexture.index));
                     } else {
-                        eng_material.textures.push_back(std::make_tuple(
-                            std::string("baseColorTexture"),
-                            database.default_albedo_map));
+                        eng_material.textures.emplace(
+                            "baseColorTexture",
+                            database.default_albedo_map);
                     }
                 }
             }
             { // 'normalTexture'.
                 auto& normalTexture = material.normalTexture;  
                 if(normalTexture.index != -1) {
-                    eng_material.textures.push_back(std::make_tuple(
-                            std::string("normalTexture"),
-                            texture_mapping.at(normalTexture.index)));
+                    eng_material.textures.emplace(
+                            "normalTexture",
+                            texture_mapping.at(normalTexture.index));
                 } else {
-                    eng_material.textures.push_back(std::make_tuple(
-                            std::string("normalTexture"),
-                            database.default_normal_map));
+                    eng_material.textures.emplace(
+                            "normalTexture",
+                            database.default_normal_map);
                 }
             }
             database.materials.push_back(std::move(eng_material));

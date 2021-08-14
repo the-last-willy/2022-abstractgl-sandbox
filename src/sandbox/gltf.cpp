@@ -7,6 +7,7 @@
 
 // Local headers.
 
+#include "engine/data/all.hpp"
 #include "engine/all.hpp"
 #include "format/gltf2/all.hpp"
 #include "program/all.hpp"
@@ -24,52 +25,68 @@
 
 //
 
+struct DirectionalLight {
+    agl::Vec3 direction = {};
+    agl::Mat4 transform = {};
+
+    agl::Texture shadow_map = {};
+};
+
+struct SpotLight {
+    agl::Vec3 direction = {};
+    agl::Mat4 transform = {};
+
+    agl::Texture shadow_map = {};
+};
+
 struct GltfProgram : Program {
     eng::Database database = {};
 
+    // G buffer.
     agl::Framebuffer g_buffer = {};
     agl::Texture albedo_texture = {};
     agl::Texture depth_texture = {};
     agl::Texture normal_texture = {};
     agl::Texture position_texture = {};
 
+    // HDR.
+    agl::Texture hdr_tex = {};
+    agl::Framebuffer hdr_fb = {}; 
+
+    // Tone mapping.
+    eng::Material tone_mapping_mat = {};
+
+
+    // Shadow map.
     agl::Framebuffer shadow_map_fb = {};
     eng::Material shadow_map_mat = {};
-    agl::Texture shadow_map_tex = {};
-    int shadow_map_resolution = 1'024;
+    // agl::Texture shadow_map_tex = {};
+    int shadow_map_resolution = 4'096;
 
-    agl::Mat4 directional_light_transform = {};
-    
-    eng::Material lighting_material = {};
+    // Ambient lighting.
+    eng::Material ambient_light_mat = {};
 
-    eng::Material ambient_lighting_material = {};
-    eng::Material directional_lighting_material = {};
+    // Directional light.
+    DirectionalLight dir_light = {};
+    // agl::Vec3 directional_light_dir = {};
+    eng::Material directional_light_mat = {};
+    // agl::Mat4 directional_light_transform = {};
 
-    eng::Material debug_material = {};
+    // Perspective shadow mapping.
+    agl::Framebuffer persp_shadow_map_fb = {};
+    eng::Material persp_shadow_map_mat = {};
 
+    // Spot light.
+    SpotLight spot_light;
+    eng::Material spot_light_mat;
+
+    // Player camera.
     tlw::PerspectiveProjection projection = {};
     tlw::View view = {};
     
     void init() override {
         { // Database defaults.
-            { // Material.
-                load(database.default_material.program, {
-                    {
-                        agl::ShaderType::vertex,
-                        file(tlw::root + "src/shader/gltf/deferred/g_buffer.vs"
-                        )
-                    },
-                    {
-                        agl::ShaderType::fragment,
-                        file(tlw::root + "src/shader/gltf/deferred/g_buffer.fs"
-                        )
-                    }});
-                database.default_material.program.capabilities = {
-                    agl::Capability::depth_test};
-                database.default_material.on_enter = []() {
-                    glDepthFunc(GL_LESS);
-                };
-            }
+            database.default_material = gltf::g_buffer_material();
             { // Albedo map.
                 database.default_albedo_map = create(agl::TextureTarget::_2d);
                 storage(
@@ -107,8 +124,6 @@ struct GltfProgram : Program {
         bool ret = loader.LoadASCIIFromFile(
             &model, &err, &warn, 
             "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
-            // "D:/data/sample/gltf2/box/Box/glTF/Box.gltf"
-            // "D:/data/sample/gltf2/box_textured/BoxTextured/glTF/BoxTextured.gltf"
             );
 
         if (!warn.empty()) {
@@ -176,93 +191,81 @@ struct GltfProgram : Program {
                 agl::FramebufferBuffer::color2};
             draw_buffers(g_buffer, std::span(fbs));
         }
-
-        { // Loading ambient lighting material.
-            load(ambient_lighting_material.program, {
-                {
-                    agl::ShaderType::vertex,
-                    file(tlw::root + "src/shader/gltf/deferred/ambient.vs")
-                },
-                {
-                    agl::ShaderType::fragment,
-                    file(tlw::root + "src/shader/gltf/deferred/ambient.fs")
-                }});
-            ambient_lighting_material.program.capabilities = {};
-            ambient_lighting_material.on_enter = []() {};
-            ambient_lighting_material.textures.push_back(
-                {"albedo_texture", albedo_texture});
-            ambient_lighting_material.textures.push_back(
-                {"normal_texture", normal_texture});
-            ambient_lighting_material.textures.push_back(
-                {"position_texture", position_texture});
-        }
-        { // Shadow maps.
-            shadow_map_tex = create(agl::TextureTarget::_2d);
-            mag_filter(shadow_map_tex, GL_NEAREST);
-            min_filter(shadow_map_tex, GL_NEAREST);
-            parameter(shadow_map_tex, agl::TextureParameter::wrap_s, GL_REPEAT); 
-            parameter(shadow_map_tex, agl::TextureParameter::wrap_t, GL_REPEAT);  
-            storage(
-                shadow_map_tex,
-                GL_DEPTH_COMPONENT32F,
-                agl::Width(shadow_map_resolution),
-                agl::Height(shadow_map_resolution));
-
-            shadow_map_mat.on_enter = [=, f = shadow_map_mat.on_enter]() {
-                f();
-                glCullFace(GL_FRONT);
-                glDepthFunc(GL_LESS);
+        
+        { // Shadow map.
+            shadow_map_mat = gltf::shadow_mapping_material();
+            shadow_map_mat.on_bind = [=]() {
                 glViewport(0, 0, shadow_map_resolution, shadow_map_resolution);
             };
-            load(shadow_map_mat.program, {
-                {
-                    agl::ShaderType::vertex, 
-                    file(tlw::root + "src/shader/gltf/shadow_map.vs")
-                },
-                {
-                    agl::ShaderType::fragment, 
-                    file(tlw::root + "src/shader/gltf/shadow_map.fs")
-                }});
-            shadow_map_mat.program.capabilities = {
-                agl::Capability::cull_face,
-                agl::Capability::depth_test};
 
             shadow_map_fb = create(agl::framebuffer_tag);
-            // glDrawBuffer(GL_NONE);
-            // glReadBuffer(GL_NONE);
-            texture(shadow_map_fb,
-                agl::TextureAttachment::depth,
-                shadow_map_tex);
         }
-        { // Loading directional lighting material.
-            load(directional_lighting_material.program, {
-                {
-                    agl::ShaderType::vertex,
-                    file(tlw::root + "src/shader/gltf/deferred/directional_lighting.vs")
-                },
-                {
-                    agl::ShaderType::fragment,
-                    file(tlw::root + "src/shader/gltf/deferred/directional_lighting.fs")
-                }});
-            directional_lighting_material.program.capabilities = {
-                    agl::Capability::blend};
-            directional_lighting_material.on_enter = []() {
-                glBlendFunc(GL_ONE, GL_ONE);
+        { // Perspective shadow mapping.
+            persp_shadow_map_mat = gltf::perspective_shadow_mapping_material();
+            persp_shadow_map_mat.on_bind = [=]() {
+                glViewport(0, 0, shadow_map_resolution, shadow_map_resolution);
             };
-            directional_lighting_material.textures.push_back(
-                {"albedo_texture", albedo_texture});
-            directional_lighting_material.textures.push_back(
-                {"normal_texture", normal_texture});
-            directional_lighting_material.textures.push_back(
-                {"position_texture", position_texture});
-            directional_lighting_material.textures.push_back(
-                {"shadow_map", shadow_map_tex});
+
+            persp_shadow_map_fb = create(agl::framebuffer_tag);
+        }
+        { // Ambient light.
+            ambient_light_mat = gltf::ambient_lighting_material();
+            ambient_light_mat.textures.emplace(
+                "albedo_texture", albedo_texture);
+            ambient_light_mat.textures.emplace(
+                "normal_texture", normal_texture);
+            ambient_light_mat.textures.emplace(
+                "position_texture", position_texture);
+        }
+        { // Directional light.
+            dir_light.shadow_map = gltf::shadow_mapping_texture(
+                shadow_map_resolution);
+
+            directional_light_mat = gltf::directional_lighting_material();
+            directional_light_mat.textures.emplace(
+                "albedo_texture", albedo_texture);
+            directional_light_mat.textures.emplace(
+                "normal_texture", normal_texture);
+            directional_light_mat.textures.emplace(
+                "position_texture", position_texture);
+            directional_light_mat.textures.emplace(
+                "shadow_map", dir_light.shadow_map);
+        }
+        { // Spot light.
+            spot_light.shadow_map = gltf::shadow_mapping_texture(
+                shadow_map_resolution);
+
+            spot_light_mat = gltf::spot_lighting_material();
+            spot_light_mat.textures.emplace(
+                "albedo_texture", albedo_texture);
+            spot_light_mat.textures.emplace(
+                "normal_texture", normal_texture);
+            spot_light_mat.textures.emplace(
+                "position_texture", position_texture);
+            spot_light_mat.textures.emplace(
+                "shadow_map", spot_light.shadow_map);
+        }
+
+        { // HDR.
+            hdr_tex = create(agl::TextureTarget::_2d);
+            mag_filter(position_texture, GL_NEAREST);
+            min_filter(position_texture, GL_NEAREST);
+            storage(
+                hdr_tex,
+                GL_RGB16F,
+                agl::Width(window.width()), agl::Height(window.height()));
+
+            hdr_fb = create(agl::framebuffer_tag);
+            texture(hdr_fb, agl::color_attachment(0), hdr_tex);
+            draw_buffer(hdr_fb, agl::FramebufferBuffer::color0);
+
+            tone_mapping_mat = gltf::tone_mapping_material();
+            tone_mapping_mat.textures["hdr_map"] = hdr_tex;
         }
 
         glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         { // Camera.
-            
         }
         
     }
@@ -293,12 +296,24 @@ struct GltfProgram : Program {
                 view.position = view.position + direction;
             }
         }
-        if(glfwGetKey(window.window, GLFW_KEY_SPACE)) { // Directional light.
+
+        // Set directional light.
+        if(glfwGetKey(window.window, GLFW_KEY_SPACE)) {
             eng::OrthographicProjection op = {};
-            op.zoom = 1.f / 1000.f;
+            op.zoom = 1.f / 500.f;
             op.near_ = 0.f;
             op.far_ = 1000.f;
-            directional_light_transform = transform(op) * inverse(transform(view));
+            dir_light.direction = agl::normalize(rotation(view)[2].xyz());
+            dir_light.transform = transform(op) * inverse(transform(view));
+        }
+
+        // Set spot light.
+        if(glfwGetKey(window.window, GLFW_KEY_SPACE)) {
+            tlw::PerspectiveProjection pp = {};
+            pp.near_ = 0.1f;
+            pp.far_ = 1000.f;
+            spot_light.direction = agl::normalize(rotation(view)[2].xyz());
+            spot_light.transform = transform(pp) * inverse(transform(view));
         }
     }
 
@@ -306,29 +321,51 @@ struct GltfProgram : Program {
         auto model = agl::scaling3(0.1f);
 
         { // Shadow map.
+            texture(
+                shadow_map_fb,
+                agl::TextureAttachment::depth,
+                dir_light.shadow_map);
+
             bind(agl::FramebufferTarget::framebuffer, shadow_map_fb);
             glClear(GL_DEPTH_BUFFER_BIT);
             
-            auto mvp = directional_light_transform * model;
+            auto mvp = dir_light.transform * model;
 
             bind(shadow_map_mat);
             for(auto& p : database.primitives) {
-                bind(p);
+                bind(p.vertex_array);
 
-                uniform(
-                    p.material->program.program,
-                    *uniform_location(p.material->program.program, "mvp"),
-                    mvp);
+                uniform(shadow_map_mat.program, "mvp", mvp);
 
                 eng::render(p);
             }
             unbind(shadow_map_mat);
         }
 
-        glViewport(0, 0, window.width(), window.height());
-        
-        bind(agl::FramebufferTarget::framebuffer, g_buffer);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        { // Perspective shadow mapping.
+            texture(
+                persp_shadow_map_fb,
+                agl::TextureAttachment::depth,
+                spot_light.shadow_map);
+
+            bind(agl::FramebufferTarget::framebuffer, persp_shadow_map_fb);
+            glClear(GL_DEPTH_BUFFER_BIT);
+
+            auto mvp = spot_light.transform * model;
+
+            bind(persp_shadow_map_mat);
+            for(auto& p : database.primitives) {
+                bind(p.vertex_array);
+
+                uniform(persp_shadow_map_mat.program, "mvp", mvp);
+
+                uniform(persp_shadow_map_mat.program, "near", 0.f);
+                uniform(persp_shadow_map_mat.program, "far", 1000.f);
+
+                eng::render(p);
+            }
+            unbind(persp_shadow_map_mat);
+        }
 
         auto inv_v = transform(view);
         auto v = inverse(inv_v) * model;
@@ -336,73 +373,107 @@ struct GltfProgram : Program {
         auto mvp = transform(projection) * v;
         auto normal_transform = transpose(inv_v);
 
-        for(auto& p : database.primitives) {
-            bind(p);
+        { // G buffer.
+            glViewport(0, 0, window.width(), window.height());
+            bind(agl::FramebufferTarget::framebuffer, g_buffer);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            uniform(
-                p.material->program.program,
-                *uniform_location(p.material->program.program, "mv"),
-                v);
-            uniform(
-                p.material->program.program,
-                *uniform_location(p.material->program.program, "mvp"),
-                mvp);
-            uniform(
-                p.material->program.program,
-                *uniform_location(p.material->program.program, "normal_transform"),
-                normal_transform);
+            for(auto& p : database.primitives) {
+                bind(p);
 
-            eng::render(p);
+                uniform(
+                    p.material->program.program,
+                    *uniform_location(p.material->program.program, "mv"),
+                    v);
+                uniform(
+                    p.material->program.program,
+                    *uniform_location(p.material->program.program, "mvp"),
+                    mvp);
+                uniform(
+                    p.material->program.program,
+                    *uniform_location(p.material->program.program, "normal_transform"),
+                    normal_transform);
 
-            unbind(p);
+                eng::render(p);
+
+                unbind(p);
+            }
         }
 
-        unbind(agl::FramebufferTarget::framebuffer);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        { // Lights.
+            bind(agl::FramebufferTarget::framebuffer, hdr_fb);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        { // Ambient lighting.
-            bind(ambient_lighting_material);
-            bind(database.empty_vertex_array);
-            draw_arrays(
-                agl::DrawMode::triangles,
-                agl::Offset<GLint>(0),
-                agl::Count<GLsizei>(6));
+            { // Ambient lighting.
+                bind(ambient_light_mat);
+                bind(database.empty_vertex_array);
+                draw_arrays(
+                    agl::DrawMode::triangles,
+                    agl::Offset<GLint>(0),
+                    agl::Count<GLsizei>(6));
 
-            unbind(ambient_lighting_material);
-        }
-
-        {
-            bind(directional_lighting_material);
-            {
-                auto light_dir = normalize(v * agl::vec4(agl::vec3(-1.f, -1.f, -1.f), 0.f)).xyz();
-                uniform(
-                    directional_lighting_material.program.program,
-                    *uniform_location(
-                        directional_lighting_material.program.program,
-                        "light_direction"),
-                    light_dir);
-                auto light_space_transform = directional_light_transform * transform(view);
-                uniform(
-                    directional_lighting_material.program.program,
-                    *uniform_location(
-                        directional_lighting_material.program.program,
-                        "light_space_transform"),
-                    light_space_transform);
-                uniform(
-                    directional_lighting_material.program.program,
-                    *uniform_location(
-                        directional_lighting_material.program.program,
-                        "view_position"),
-                    view.position);
+                unbind(ambient_light_mat);
             }
 
+            { // Directional lights.
+                bind(directional_light_mat);
+                {
+                    auto light_dir = normalize(v * agl::vec4(dir_light.direction, 0.f)).xyz();
+                    uniform(
+                        directional_light_mat.program,
+                        "light_direction",
+                        light_dir);
+                    auto light_space_transform = dir_light.transform * transform(view);
+                    uniform(
+                        directional_light_mat.program,
+                        "light_space_transform",
+                        light_space_transform);
+                    uniform(
+                        directional_light_mat.program,
+                        "view_position",
+                        view.position);
+                }
+
+                bind(database.empty_vertex_array);
+                draw_arrays(
+                    agl::DrawMode::triangles,
+                    agl::Offset<GLint>(0),
+                    agl::Count<GLsizei>(6));
+
+                unbind(directional_light_mat);
+            }
+
+            // { // Spot lights.
+            //     bind(spot_light_mat);
+            //     {
+            //         auto light_dir = normalize(v * agl::vec4(spot_light.direction, 0.f)).xyz();
+            //         uniform(spot_light_mat.program, "light_direction", light_dir);
+            //         auto light_space_transform = spot_light.transform * transform(view);
+            //         uniform(spot_light_mat.program, "light_space_transform", light_space_transform);
+            //         uniform(spot_light_mat.program, "view_position", view.position);
+            //     }
+
+            //     bind(database.empty_vertex_array);
+            //     draw_arrays(
+            //         agl::DrawMode::triangles,
+            //         agl::Offset<GLint>(0),
+            //         agl::Count<GLsizei>(6));
+
+            //     unbind(spot_light_mat);
+            // }
+        }
+
+        { // Tone mapping.
+            unbind(agl::FramebufferTarget::framebuffer);
+            bind(tone_mapping_mat);
+
             bind(database.empty_vertex_array);
             draw_arrays(
                 agl::DrawMode::triangles,
                 agl::Offset<GLint>(0),
                 agl::Count<GLsizei>(6));
 
-            unbind(directional_lighting_material);
+            unbind(tone_mapping_mat);
         }
     }
 };

@@ -5,7 +5,7 @@
 #include <agl/all.hpp>
 
 #include <functional>
-#include <iostream>
+#include <map>
 #include <tuple>
 
 namespace eng {
@@ -13,9 +13,9 @@ namespace eng {
 struct Material {
     eng::Program program = {};
 
-    std::vector<std::tuple<std::string, agl::Texture>> textures = {};
+    std::map<std::string, agl::Texture> textures = {};
 
-    std::function<void()> on_enter = [](){};
+    std::function<void()> on_bind = [](){};
 };
 
 inline
@@ -31,13 +31,13 @@ void bind_textures(const Material& m) {
             // std::cout << uniform << std::endl;
         }
     }
+    m.on_bind();
 }
 
 inline
 void bind(const Material& m) {
     bind(m.program);
     bind_textures(m);
-    m.on_enter();
 }
 
 inline
