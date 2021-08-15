@@ -39,5 +39,5 @@ void main() {
     float shadow_bias = .00;
     bool shadow = shadow_depth + shadow_bias < light_position.z;
 
-    fragment_rgb = shadow ? vec3(0.) : .7 * diffuse + .5 * specular;
+    // fragment_rgb = shadow ? vec3(0.) : .7 * diffuse + .5 * specular;
 }

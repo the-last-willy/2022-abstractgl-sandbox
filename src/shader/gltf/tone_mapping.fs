@@ -19,14 +19,14 @@ vec3 Tonemap_ACES(vec3 x) {
 
 void main() {
     vec3 hdr = texture(hdr_map, vertex_texcoords).rgb;
-    if(gl_FragCoord.x < 640) {
-        fragment_ldr = hdr;
-    } else {
-        float w = 1.2;
-        hdr = Tonemap_ACES(hdr);
-        // float gamma = 2.;
-        // hdr = pow(hdr, vec3(gamma));
-        fragment_ldr = hdr;
-    }
-// fragment_ldr = hdr;
+    // if(gl_FragCoord.x < 640) {
+    //     fragment_ldr = hdr;
+    // } else {
+    //     float w = 1.2;
+    //     hdr = Tonemap_ACES(hdr);
+    //     // float gamma = 2.;
+    //     // hdr = pow(hdr, vec3(gamma));
+    //     fragment_ldr = hdr;
+    // }
+    fragment_ldr = hdr;
 }

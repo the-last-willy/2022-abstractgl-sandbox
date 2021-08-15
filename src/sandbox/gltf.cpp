@@ -39,6 +39,10 @@ struct SpotLight {
     agl::Texture shadow_map = {};
 };
 
+struct PointLight {
+    agl::Vec3 position = {};
+};
+
 struct GltfProgram : Program {
     eng::Database database = {};
 
@@ -56,29 +60,32 @@ struct GltfProgram : Program {
     // Tone mapping.
     eng::Material tone_mapping_mat = {};
 
-
     // Shadow map.
     agl::Framebuffer shadow_map_fb = {};
     eng::Material shadow_map_mat = {};
-    // agl::Texture shadow_map_tex = {};
     int shadow_map_resolution = 4'096;
+
+    // Cube shadow map.
+    int cube_shadow_map_res = 1'024;
+    agl::Texture cube_shadow_map_tex = {};
+    eng::Material cube_shadow_map_mat = {};
+    tlw::PerspectiveProjection cube_shadow_map_proj = {};
+    std::array<tlw::View, 6> cube_shadow_map_views = {};
 
     // Ambient lighting.
     eng::Material ambient_light_mat = {};
 
     // Directional light.
     DirectionalLight dir_light = {};
-    // agl::Vec3 directional_light_dir = {};
-    eng::Material directional_light_mat = {};
-    // agl::Mat4 directional_light_transform = {};
-
-    // Perspective shadow mapping.
-    agl::Framebuffer persp_shadow_map_fb = {};
-    eng::Material persp_shadow_map_mat = {};
+    eng::Material dir_light_mat = {};
 
     // Spot light.
     SpotLight spot_light;
     eng::Material spot_light_mat;
+
+    // Point light.
+    PointLight point_light = {};
+    eng::Material point_light_mat = {};
 
     // Player camera.
     tlw::PerspectiveProjection projection = {};
@@ -200,14 +207,35 @@ struct GltfProgram : Program {
 
             shadow_map_fb = create(agl::framebuffer_tag);
         }
-        { // Perspective shadow mapping.
-            persp_shadow_map_mat = gltf::perspective_shadow_mapping_material();
-            persp_shadow_map_mat.on_bind = [=]() {
-                glViewport(0, 0, shadow_map_resolution, shadow_map_resolution);
+
+        { // Cube shadow map.
+            cube_shadow_map_tex = gltf::cube_shadow_mapping_texture(cube_shadow_map_res);
+            cube_shadow_map_mat = gltf::cubic_shadow_mapping_material();
+            cube_shadow_map_mat.on_bind = [=]() {
+                glViewport(0, 0, cube_shadow_map_res, cube_shadow_map_res);
             };
 
-            persp_shadow_map_fb = create(agl::framebuffer_tag);
+            cube_shadow_map_proj.aspect_ratio = 1.f;
+
+            // X+
+            cube_shadow_map_views[0].yaw = agl::pi / 2.f;
+
+            // X-
+            cube_shadow_map_views[1].yaw = -agl::pi / 2.f;
+
+            // Y+
+            cube_shadow_map_views[2].pitch = agl::pi / 2.f;
+
+            // Y-
+            cube_shadow_map_views[3].pitch = -agl::pi / 2.f;
+
+            // Z+
+            cube_shadow_map_views[4].yaw = 0.f;
+
+            // Z-
+            cube_shadow_map_views[5].yaw = agl::pi;
         }
+
         { // Ambient light.
             ambient_light_mat = gltf::ambient_lighting_material();
             ambient_light_mat.textures.emplace(
@@ -221,14 +249,14 @@ struct GltfProgram : Program {
             dir_light.shadow_map = gltf::shadow_mapping_texture(
                 shadow_map_resolution);
 
-            directional_light_mat = gltf::directional_lighting_material();
-            directional_light_mat.textures.emplace(
+            dir_light_mat = gltf::directional_lighting_material();
+            dir_light_mat.textures.emplace(
                 "albedo_texture", albedo_texture);
-            directional_light_mat.textures.emplace(
+            dir_light_mat.textures.emplace(
                 "normal_texture", normal_texture);
-            directional_light_mat.textures.emplace(
+            dir_light_mat.textures.emplace(
                 "position_texture", position_texture);
-            directional_light_mat.textures.emplace(
+            dir_light_mat.textures.emplace(
                 "shadow_map", dir_light.shadow_map);
         }
         { // Spot light.
@@ -244,6 +272,14 @@ struct GltfProgram : Program {
                 "position_texture", position_texture);
             spot_light_mat.textures.emplace(
                 "shadow_map", spot_light.shadow_map);
+        }
+
+        { // Point light.
+            point_light_mat = gltf::point_lighting_material();
+            point_light_mat.textures["albedo_texture"] = albedo_texture;
+            point_light_mat.textures["normal_texture"] = normal_texture;
+            point_light_mat.textures["position_texture"] = position_texture;
+            point_light_mat.textures["shadow_map"] = cube_shadow_map_tex;
         }
 
         { // HDR.
@@ -266,6 +302,7 @@ struct GltfProgram : Program {
         glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         { // Camera.
+
         }
         
     }
@@ -315,12 +352,39 @@ struct GltfProgram : Program {
             spot_light.direction = agl::normalize(rotation(view)[2].xyz());
             spot_light.transform = transform(pp) * inverse(transform(view));
         }
+
+        // Set spot light.
+        if(glfwGetKey(window.window, GLFW_KEY_SPACE)) {
+            point_light.position = view.position;
+        }
     }
 
     void render() override {
         auto model = agl::scaling3(0.1f);
 
-        { // Shadow map.
+        // { // Shadow map.
+        //     texture(
+        //         shadow_map_fb,
+        //         agl::TextureAttachment::depth,
+        //         dir_light.shadow_map);
+
+        //     bind(agl::FramebufferTarget::framebuffer, shadow_map_fb);
+        //     glClear(GL_DEPTH_BUFFER_BIT);
+            
+        //     auto mvp = dir_light.transform * model;
+
+        //     bind(shadow_map_mat);
+        //     for(auto& p : database.primitives) {
+        //         bind(p.vertex_array);
+
+        //         uniform(shadow_map_mat.program, "mvp", mvp);
+
+        //         eng::render(p);
+        //     }
+        //     unbind(shadow_map_mat);
+        // }
+
+        { // Spot shadow mapping.
             texture(
                 shadow_map_fb,
                 agl::TextureAttachment::depth,
@@ -329,7 +393,7 @@ struct GltfProgram : Program {
             bind(agl::FramebufferTarget::framebuffer, shadow_map_fb);
             glClear(GL_DEPTH_BUFFER_BIT);
             
-            auto mvp = dir_light.transform * model;
+            auto mvp = spot_light.transform * model;
 
             bind(shadow_map_mat);
             for(auto& p : database.primitives) {
@@ -342,29 +406,34 @@ struct GltfProgram : Program {
             unbind(shadow_map_mat);
         }
 
-        { // Perspective shadow mapping.
-            texture(
-                persp_shadow_map_fb,
-                agl::TextureAttachment::depth,
-                spot_light.shadow_map);
+        { // Cube shadow mapping.
+            bind(agl::FramebufferTarget::framebuffer, shadow_map_fb);
 
-            bind(agl::FramebufferTarget::framebuffer, persp_shadow_map_fb);
-            glClear(GL_DEPTH_BUFFER_BIT);
+            bind(cube_shadow_map_mat);
+            for(int face_i = 0; face_i < 6; ++face_i) {
+                texture(
+                    shadow_map_fb,
+                    agl::TextureAttachment::depth,
+                    cube_shadow_map_tex,
+                    agl::Level(0),
+                    face_i);
+                glClear(GL_DEPTH_BUFFER_BIT);
 
-            auto mvp = spot_light.transform * model;
+                auto vp = transform(cube_shadow_map_proj)
+                * inverse(transform(cube_shadow_map_views[face_i]))
+                * inverse(agl::translation(point_light.position));
+                
+                // auto mvp = spot_light.transform * model;
 
-            bind(persp_shadow_map_mat);
-            for(auto& p : database.primitives) {
-                bind(p.vertex_array);
-
-                uniform(persp_shadow_map_mat.program, "mvp", mvp);
-
-                uniform(persp_shadow_map_mat.program, "near", 0.f);
-                uniform(persp_shadow_map_mat.program, "far", 1000.f);
-
-                eng::render(p);
+                for(auto& p : database.primitives) {
+                    bind(p.vertex_array);
+                    auto mvp = vp * model;
+                    uniform(cube_shadow_map_mat.program, "far", 1000.f);
+                    uniform(cube_shadow_map_mat.program, "mvp", mvp);
+                    eng::render(p);
+                }
             }
-            unbind(persp_shadow_map_mat);
+            unbind(cube_shadow_map_mat);
         }
 
         auto inv_v = transform(view);
@@ -415,43 +484,14 @@ struct GltfProgram : Program {
                 unbind(ambient_light_mat);
             }
 
-            { // Directional lights.
-                bind(directional_light_mat);
-                {
-                    auto light_dir = normalize(v * agl::vec4(dir_light.direction, 0.f)).xyz();
-                    uniform(
-                        directional_light_mat.program,
-                        "light_direction",
-                        light_dir);
-                    auto light_space_transform = dir_light.transform * transform(view);
-                    uniform(
-                        directional_light_mat.program,
-                        "light_space_transform",
-                        light_space_transform);
-                    uniform(
-                        directional_light_mat.program,
-                        "view_position",
-                        view.position);
-                }
+            // { // Directional lights.
+            //     bind(dir_light_mat);
 
-                bind(database.empty_vertex_array);
-                draw_arrays(
-                    agl::DrawMode::triangles,
-                    agl::Offset<GLint>(0),
-                    agl::Count<GLsizei>(6));
-
-                unbind(directional_light_mat);
-            }
-
-            // { // Spot lights.
-            //     bind(spot_light_mat);
-            //     {
-            //         auto light_dir = normalize(v * agl::vec4(spot_light.direction, 0.f)).xyz();
-            //         uniform(spot_light_mat.program, "light_direction", light_dir);
-            //         auto light_space_transform = spot_light.transform * transform(view);
-            //         uniform(spot_light_mat.program, "light_space_transform", light_space_transform);
-            //         uniform(spot_light_mat.program, "view_position", view.position);
-            //     }
+            //     auto light_dir = normalize(v * agl::vec4(dir_light.direction, 0.f)).xyz();
+            //     uniform(dir_light_mat.program, "light_direction", light_dir);
+            //     auto light_space_transform = dir_light.transform * transform(view);
+            //     uniform(dir_light_mat.program, "light_space_transform", light_space_transform);
+            //     uniform(dir_light_mat.program, "view_position", view.position);
 
             //     bind(database.empty_vertex_array);
             //     draw_arrays(
@@ -459,7 +499,44 @@ struct GltfProgram : Program {
             //         agl::Offset<GLint>(0),
             //         agl::Count<GLsizei>(6));
 
-            //     unbind(spot_light_mat);
+            //     unbind(dir_light_mat);
+            // }
+
+            { // Spot lights.
+                bind(dir_light_mat);
+
+                auto light_dir = normalize(v * agl::vec4(spot_light.direction, 0.f)).xyz();
+                uniform(dir_light_mat.program, "light_direction", light_dir);
+                auto light_space_transform = spot_light.transform * transform(view);
+                uniform(dir_light_mat.program, "light_space_transform", light_space_transform);
+                uniform(dir_light_mat.program, "view_position", view.position);
+
+                uniform(dir_light_mat.program, "near_plane", 0.1f);
+                uniform(dir_light_mat.program, "far_plane", 1000.f);
+
+                bind(database.empty_vertex_array);
+                draw_arrays(
+                    agl::DrawMode::triangles,
+                    agl::Offset<GLint>(0),
+                    agl::Count<GLsizei>(6));
+
+                unbind(dir_light_mat);
+            }
+
+            // { // Point lights.
+            //     bind(point_light_mat);
+
+            //     auto light_position = v * vec4(point_light.position, 1.f);
+            //     uniform(dir_light_mat.program, "light_position", light_position.xyz());
+            //     uniform(dir_light_mat.program, "view_position", view.position);
+
+            //     bind(database.empty_vertex_array);
+            //     draw_arrays(
+            //         agl::DrawMode::triangles,
+            //         agl::Offset<GLint>(0),
+            //         agl::Count<GLsizei>(6));
+
+            //     unbind(point_light_mat);
             // }
         }
 

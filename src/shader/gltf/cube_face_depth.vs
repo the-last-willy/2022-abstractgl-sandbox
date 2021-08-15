@@ -5,6 +5,12 @@ uniform mat4 mvp;
 // LOCATION TIED TO G_BUFFER SHADER.
 layout(location = 1) in vec3 POSITION;
 
+out vec3 vertex_pos;
+
 void main() {
-    gl_Position = mvp * vec4(POSITION, 1.);
+    vec4 position = mvp * vec4(POSITION, 1.);
+
+    vertex_pos = position.xyz;
+
+    gl_Position = position;
 }
