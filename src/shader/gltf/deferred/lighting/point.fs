@@ -5,7 +5,12 @@ uniform sampler2D normal_texture;
 uniform sampler2D position_texture;
 uniform samplerCubeArray shadow_map;
 
+uniform float light_distance = 1000.;
+// View space.
 uniform vec3 light_position;
+// View space -> light space.
+uniform mat4 light_transform;
+
 uniform vec3 view_position;
 
 uniform float far;
@@ -20,8 +25,26 @@ void main() {
     // View space.
     vec3 position = texture(position_texture, vertex_texcoords).xyz;
 
-    float position_depth = length(position - light_position) / 100.f;
+    // View space.
+    vec3 view_direction = normalize(position);
 
-    fragment_rgb = vec3(position_depth);
+    // (View space).
+    vec3 light_direction_vs = normalize(position - light_position);
+    // Light space.
+    vec3 light_direction_ls = normalize((light_transform * vec4(light_direction_vs, 0.)).xyz);
+    light_direction_ls.y *= -1;
 
+    float light_depth = light_distance * texture(shadow_map, vec4(light_direction_ls, 0.)).x;
+    float fragment_depth = length(position - light_position);
+
+    float shadow_bias = .0005 * light_distance;;
+    float shadow = 1. - min((1. - float(light_depth + shadow_bias < fragment_depth)) / fragment_depth * 100., 1.);
+
+    float lambertian = max(dot(normal, -light_direction_vs), 0.);
+    vec3 diffuse = lambertian * albedo;
+
+    float shininess = 64.;
+    float specular = pow(max(dot(view_direction, -normalize(reflect(light_direction_vs, normal))), 0.), shininess);
+
+    fragment_rgb = (1. - shadow) * (.7 * diffuse + .5 * specular);
 }

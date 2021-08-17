@@ -9,7 +9,6 @@ uniform sampler2D shadow_map;
 uniform mat4 light_space_transform;
 
 uniform vec3 light_direction;
-uniform vec3 view_position;
 
 in vec2 vertex_texcoords;
 

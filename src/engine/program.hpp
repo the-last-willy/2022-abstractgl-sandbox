@@ -20,7 +20,7 @@ void load(
     Program& p,
     const std::map<agl::ShaderType, std::string> shader_sources)
 {
-    p.program = create(agl::program_tag);
+    p.program = agl::create(agl::program_tag);
     for(auto& [type, src] : shader_sources) {
         auto s = create(type);
         source(s, src);

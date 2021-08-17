@@ -8,6 +8,7 @@
 #include "perspective_shadow_mapping_material.hpp"
 #include "point_light_material.hpp"
 #include "shadow_mapping_material.hpp"
-#include "shadow_mapping_texture.hpp" 
+#include "shadow_mapping_texture.hpp"
+#include "skybox_material.hpp"
 #include "spot_lighting_material.hpp"
 #include "tone_mapping_material.hpp"
