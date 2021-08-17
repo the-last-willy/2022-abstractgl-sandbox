@@ -9,11 +9,11 @@ auto spot_lighting_material() {
     auto m = eng::Material();
     load(m.program, {
         {
-            agl::ShaderType::vertex,
+            agl::vertex_shader_tag,
             file(tlw::root + "src/shader/gltf/deferred/lighting/spot_lighting.vs")
         },
         {
-            agl::ShaderType::fragment,
+            agl::fragment_shader_tag,
             file(tlw::root + "src/shader/gltf/deferred/lighting/spot_lighting.fs")
         }});
     m.program.capabilities.emplace_back(

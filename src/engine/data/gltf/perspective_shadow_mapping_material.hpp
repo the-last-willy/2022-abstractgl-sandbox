@@ -9,11 +9,11 @@ auto perspective_shadow_mapping_material() {
     auto m = eng::Material();
     load(m.program, {
         {
-            agl::ShaderType::vertex, 
+            agl::vertex_shader_tag, 
             file(tlw::root + "src/shader/gltf/perspective_shadow_map.vs")
         },
         {
-            agl::ShaderType::fragment, 
+            agl::fragment_shader_tag, 
             file(tlw::root + "src/shader/gltf/perspective_shadow_map.fs")
         }});
     m.program.capabilities.emplace_back(

@@ -47,7 +47,7 @@ struct GltfProgram : Program {
     eng::Database database = {};
 
     // G buffer.
-    agl::Framebuffer g_buffer = {};
+    eng::Framebuffer g_buffer = {};
     agl::Texture albedo_texture = {};
     agl::Texture depth_texture = {};
     agl::Texture normal_texture = {};
@@ -64,7 +64,7 @@ struct GltfProgram : Program {
     eng::Material tone_mapping_mat = {};
 
     // Shadow map.
-    agl::Framebuffer shadow_map_fb = {};
+    eng::Framebuffer shadow_map_fb = {};
     eng::Material shadow_map_mat = {};
     int shadow_map_resolution = 4'096;
 
@@ -152,7 +152,7 @@ struct GltfProgram : Program {
         format::gltf2::fill(database, model);
 
         { // GBuffer.
-            g_buffer = agl::create(agl::framebuffer_tag);
+            g_buffer.opengl = agl::create(agl::framebuffer_tag);
             { // Albedo texture.
                 albedo_texture = agl::create(agl::TextureTarget::_2d);
                 mag_filter(albedo_texture, GL_LINEAR);
@@ -160,8 +160,8 @@ struct GltfProgram : Program {
                 storage(
                     albedo_texture, GL_RGB32F,
                     agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer,
-                    agl::color_attachment(0),
+                texture(g_buffer.opengl,
+                    agl::ColorAttachment(0),
                     albedo_texture);
             }
             { // Depth texture.
@@ -169,8 +169,8 @@ struct GltfProgram : Program {
                 storage(
                     depth_texture, GL_DEPTH_COMPONENT32F,
                     agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer,
-                    agl::TextureAttachment::depth,
+                texture(g_buffer.opengl,
+                    agl::depth_tag,
                     depth_texture);
             }
             { // Normal texture.
@@ -180,8 +180,8 @@ struct GltfProgram : Program {
                 storage(
                     normal_texture, GL_RGB32F,
                     agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer,
-                    agl::color_attachment(1),
+                texture(g_buffer.opengl,
+                    agl::ColorAttachment(1),
                     normal_texture);
             }
             { // Position texture. 
@@ -191,18 +191,16 @@ struct GltfProgram : Program {
                 storage(
                     position_texture, GL_RGB32F,
                     agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer,
-                    agl::color_attachment(2),
+                texture(g_buffer.opengl,
+                    agl::ColorAttachment(2),
                     position_texture);
             }
-            auto fbs = std::array{
-                agl::FramebufferBuffer::color0,
-                agl::FramebufferBuffer::color1,
-                agl::FramebufferBuffer::color2};
-            draw_buffers(g_buffer, std::span(fbs));
+            auto fbs = std::array<agl::FramebufferDrawBuffer, 3>{
+                agl::ColorAttachment(0),
+                agl::ColorAttachment(1),
+                agl::ColorAttachment(2),};
+            draw_buffers(g_buffer.opengl, std::span(fbs));
         }
-
-        
         
         { // Shadow map.
             shadow_map_mat = gltf::shadow_mapping_material();
@@ -210,7 +208,9 @@ struct GltfProgram : Program {
                 glViewport(0, 0, shadow_map_resolution, shadow_map_resolution);
             };
 
-            shadow_map_fb = agl::create(agl::framebuffer_tag);
+            shadow_map_fb.opengl = create(agl::framebuffer_tag);
+            shadow_map_fb.on_clear = [](const agl::Framebuffer& f) {
+                clear(f, agl::depth_tag, 1.f); };
         }
 
         { // Cube shadow map.
@@ -224,19 +224,14 @@ struct GltfProgram : Program {
 
             // X+
             cube_shadow_map_views[0].yaw = agl::pi / 2.f;
-
             // X-
             cube_shadow_map_views[1].yaw = -agl::pi / 2.f;
-
             // Y+
             cube_shadow_map_views[2].pitch = agl::pi / 2.f;
-
             // Y-
             cube_shadow_map_views[3].pitch = -agl::pi / 2.f;
-
             // Z+
             cube_shadow_map_views[4].yaw = 0.f;
-
             // Z-
             cube_shadow_map_views[5].yaw = agl::pi;
         }
@@ -248,40 +243,25 @@ struct GltfProgram : Program {
 
         { // Ambient light.
             ambient_light_mat = gltf::ambient_lighting_material();
-            ambient_light_mat.textures.emplace(
-                "albedo_texture", albedo_texture);
-            ambient_light_mat.textures.emplace(
-                "normal_texture", normal_texture);
-            ambient_light_mat.textures.emplace(
-                "position_texture", position_texture);
+            ambient_light_mat.textures["albedo_texture"] = albedo_texture;
+            ambient_light_mat.textures["normal_texture"] = normal_texture;
+            ambient_light_mat.textures["position_texture"] = position_texture;
         }
         { // Directional light.
-            dir_light.shadow_map = gltf::shadow_mapping_texture(
-                shadow_map_resolution);
-
+            dir_light.shadow_map = gltf::shadow_mapping_texture(shadow_map_resolution);
             dir_light_mat = gltf::directional_lighting_material();
-            dir_light_mat.textures.emplace(
-                "albedo_texture", albedo_texture);
-            dir_light_mat.textures.emplace(
-                "normal_texture", normal_texture);
-            dir_light_mat.textures.emplace(
-                "position_texture", position_texture);
-            dir_light_mat.textures.emplace(
-                "shadow_map", dir_light.shadow_map);
+            dir_light_mat.textures["albedo_texture"] = albedo_texture;
+            dir_light_mat.textures["normal_texture"] = normal_texture;
+            dir_light_mat.textures["position_texture"] = position_texture;
+            dir_light_mat.textures["shadow_map"] = dir_light.shadow_map;
         }
         { // Spot light.
-            spot_light.shadow_map = gltf::shadow_mapping_texture(
-                shadow_map_resolution);
-
+            spot_light.shadow_map = gltf::shadow_mapping_texture(shadow_map_resolution);
             spot_light_mat = gltf::spot_lighting_material();
-            spot_light_mat.textures.emplace(
-                "albedo_texture", albedo_texture);
-            spot_light_mat.textures.emplace(
-                "normal_texture", normal_texture);
-            spot_light_mat.textures.emplace(
-                "position_texture", position_texture);
-            spot_light_mat.textures.emplace(
-                "shadow_map", spot_light.shadow_map);
+            spot_light_mat.textures["albedo_texture"] = albedo_texture;
+            spot_light_mat.textures["normal_texture"] = normal_texture;
+            spot_light_mat.textures["position_texture"] = position_texture;
+            spot_light_mat.textures["shadow_map"] = spot_light.shadow_map;
         }
 
         { // Point light.
@@ -293,7 +273,7 @@ struct GltfProgram : Program {
         }
 
         { // HDR.
-            hdr_tex = agl::create(agl::TextureTarget::_2d);
+            hdr_tex = create(agl::TextureTarget::_2d);
             mag_filter(position_texture, GL_NEAREST);
             min_filter(position_texture, GL_NEAREST);
             storage(
@@ -301,9 +281,9 @@ struct GltfProgram : Program {
                 GL_RGB16F,
                 agl::Width(window.width()), agl::Height(window.height()));
 
-            hdr_fb = agl::create(agl::framebuffer_tag);
-            texture(hdr_fb, agl::color_attachment(0), hdr_tex);
-            draw_buffer(hdr_fb, agl::FramebufferBuffer::color0);
+            hdr_fb = create(agl::framebuffer_tag);
+            texture(hdr_fb, agl::ColorAttachment(0), hdr_tex);
+            draw_buffer(hdr_fb, agl::ColorAttachment(0));
 
             tone_mapping_mat = gltf::tone_mapping_material();
             tone_mapping_mat.textures["hdr_map"] = hdr_tex;
@@ -375,12 +355,12 @@ struct GltfProgram : Program {
 
         if constexpr(false) { // Shadow map.
             texture(
-                shadow_map_fb,
-                agl::TextureAttachment::depth,
+                shadow_map_fb.opengl,
+                agl::depth_tag,
                 dir_light.shadow_map);
 
-            bind(agl::FramebufferTarget::framebuffer, shadow_map_fb);
-            glClear(GL_DEPTH_BUFFER_BIT);
+            bind(shadow_map_fb);
+            clear(shadow_map_fb);
             
             auto mvp = dir_light.transform * m;
 
@@ -397,12 +377,12 @@ struct GltfProgram : Program {
 
         if constexpr(false) { // Spot shadow mapping.
             texture(
-                shadow_map_fb,
-                agl::TextureAttachment::depth,
+                shadow_map_fb.opengl,
+                agl::depth_tag,
                 dir_light.shadow_map);
 
-            bind(agl::FramebufferTarget::framebuffer, shadow_map_fb);
-            glClear(GL_DEPTH_BUFFER_BIT);
+            bind(shadow_map_fb);
+            clear(shadow_map_fb);
             
             auto mvp = spot_light.transform * m;
 
@@ -418,13 +398,13 @@ struct GltfProgram : Program {
         }
 
         { // Cube shadow mapping.
-            bind(agl::FramebufferTarget::framebuffer, shadow_map_fb);
+            bind(shadow_map_fb);
 
             bind(cube_shadow_map_mat);
             for(int face_i = 0; face_i < 6; ++face_i) {
                 texture(
-                    shadow_map_fb,
-                    agl::TextureAttachment::depth,
+                    shadow_map_fb.opengl,
+                    agl::depth_tag,
                     cube_shadow_map_tex,
                     agl::Level(0),
                     face_i);
@@ -433,8 +413,6 @@ struct GltfProgram : Program {
                 auto vp = transform(cube_shadow_map_proj)
                 * inverse(transform(cube_shadow_map_views[face_i]))
                 * inverse(agl::translation(point_light.position));
-                
-                // auto mvp = spot_light.transform * model;
 
                 for(auto& p : database.primitives) {
                     bind(p.vertex_array);
@@ -447,8 +425,6 @@ struct GltfProgram : Program {
             unbind(cube_shadow_map_mat);
         }
 
-        
-
         auto inv_v = transform(view);
         auto v = inverse(inv_v);
 
@@ -457,24 +433,16 @@ struct GltfProgram : Program {
 
         { // G buffer.
             glViewport(0, 0, window.width(), window.height());
-            bind(agl::FramebufferTarget::framebuffer, g_buffer);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            bind(g_buffer);
+            clear(g_buffer.opengl, agl::depth_tag, 1.f);
+            glClear(GL_COLOR_BUFFER_BIT);
 
             for(auto& p : database.primitives) {
                 bind(p);
 
-                uniform(
-                    p.material->program.program,
-                    *uniform_location(p.material->program.program, "mv"),
-                    v * m);
-                uniform(
-                    p.material->program.program,
-                    *uniform_location(p.material->program.program, "mvp"),
-                    mvp);
-                uniform(
-                    p.material->program.program,
-                    *uniform_location(p.material->program.program, "normal_transform"),
-                    normal_transform);
+                uniform(p.material.program, "mv", v * m);
+                uniform(p.material.program, "mvp", mvp);
+                uniform(p.material.program, "normal_transform", normal_transform);
 
                 eng::render(p);
 
@@ -483,8 +451,8 @@ struct GltfProgram : Program {
         }
 
         { // Lights.
-            bind(agl::FramebufferTarget::framebuffer, hdr_fb);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            bind(hdr_fb);
+            clear(hdr_fb, agl::color_tag, {0.f, 0.f, 0.f, 1.f});
 
             // Skybox
             if constexpr(false) {
@@ -506,7 +474,6 @@ struct GltfProgram : Program {
                     agl::DrawMode::triangles,
                     agl::Offset<GLint>(0),
                     agl::Count<GLsizei>(6));
-
                 unbind(ambient_light_mat);
             }
 
@@ -537,15 +504,12 @@ struct GltfProgram : Program {
                 uniform(dir_light_mat.program, "light_space_transform", light_space_transform);
                 uniform(dir_light_mat.program, "view_position", view.position);
 
-                uniform(dir_light_mat.program, "near_plane", 0.1f);
-                uniform(dir_light_mat.program, "far_plane", 1000.f);
-
                 bind(database.empty_vertex_array);
                 draw_arrays(
                     agl::DrawMode::triangles,
                     agl::Offset<GLint>(0),
                     agl::Count<GLsizei>(6));
-
+                
                 unbind(dir_light_mat);
             }
 
@@ -568,7 +532,7 @@ struct GltfProgram : Program {
         }
 
         { // Tone mapping.
-            unbind(agl::FramebufferTarget::framebuffer);
+            bind(agl::default_framebuffer);
             bind(tone_mapping_mat);
 
             bind(database.empty_vertex_array);

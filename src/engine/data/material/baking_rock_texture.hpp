@@ -9,11 +9,11 @@ auto make_baking_rock_texture_material() {
         auto& p = material.program;
         auto shaders = std::map<agl::ShaderType, std::string>{
             {
-                agl::ShaderType::vertex,
+                agl::vertex_shader_tag,
                 file(root + "src/shader/rock/bake_texture.vs")
             },
             {
-                agl::ShaderType::fragment,
+                agl::fragment_shader_tag,
                 file(root + "src/shader/rock/bake_texture.fs")
             },
         };

@@ -9,12 +9,12 @@ auto g_buffer_material() {
     auto m = eng::Material();
     load(m.program, {
         {
-            agl::ShaderType::vertex,
+            agl::vertex_shader_tag,
             file(tlw::root + "src/shader/gltf/deferred/g_buffer.vs"
             )
         },
         {
-            agl::ShaderType::fragment,
+            agl::fragment_shader_tag,
             file(tlw::root + "src/shader/gltf/deferred/g_buffer.fs"
             )
         }});
