@@ -8,7 +8,7 @@ namespace eng {
 
 struct Capability {
     agl::Capability capability;
-    std::function<void()> on_enable;
+    std::function<void()> on_enable = [](){};
 };
 
 inline
