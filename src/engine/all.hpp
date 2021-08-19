@@ -6,5 +6,5 @@
 #include "framebuffer.hpp"
 #include "material.hpp"
 #include "mesh.hpp"
+#include "node.hpp"
 #include "texture.hpp"
-

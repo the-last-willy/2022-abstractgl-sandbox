@@ -46,6 +46,9 @@ struct PointLight {
 struct GltfProgram : Program {
     eng::Database database = {};
 
+    // glTF file.
+    format::gltf2::Content scene = {};
+
     // G buffer.
     eng::Framebuffer g_buffer = {};
     agl::Texture albedo_texture = {};
@@ -149,7 +152,27 @@ struct GltfProgram : Program {
             std::exit(EXIT_FAILURE);
         }
 
-        format::gltf2::fill(database, model);
+        scene = format::gltf2::fill(model);
+
+        { // Normalizing materials.
+            for(auto& [_, p] : scene.primitives) {
+                auto& m = p.material;
+                m.program.program = database.default_material.program.program;
+
+                if(!m.textures.contains("baseColorTexture")) {
+                    m.textures["baseColorTexture"] = database.default_albedo_map;
+                }
+                if(!m.textures.contains("normalTexture")) {
+                    m.textures["normalTexture"] = database.default_normal_map;
+                }
+            }
+        }
+
+        { // Vertex attribute plumbing.
+            for(auto& [_, p] : scene.primitives) {
+                bind(p, p.material);
+            }
+        }
 
         { // GBuffer.
             g_buffer.opengl = agl::create(agl::framebuffer_tag);
@@ -365,12 +388,11 @@ struct GltfProgram : Program {
             auto mvp = dir_light.transform * m;
 
             bind(shadow_map_mat);
-            for(auto& p : database.primitives) {
-                bind(p.vertex_array);
-
+            for(auto [_, p] : scene.primitives) {
+                bind(p);
                 uniform(shadow_map_mat.program, "mvp", mvp);
-
                 eng::render(p);
+                unbind(p);
             }
             unbind(shadow_map_mat);
         }
@@ -387,17 +409,16 @@ struct GltfProgram : Program {
             auto mvp = spot_light.transform * m;
 
             bind(shadow_map_mat);
-            for(auto& p : database.primitives) {
+            for(auto [_, p]: scene.primitives) {
                 bind(p.vertex_array);
-
                 uniform(shadow_map_mat.program, "mvp", mvp);
-
                 eng::render(p);
+                unbind(p, shadow_map_mat);
             }
             unbind(shadow_map_mat);
         }
 
-        { // Cube shadow mapping.
+        if constexpr(true) { // Cube shadow mapping.
             bind(shadow_map_fb);
 
             bind(cube_shadow_map_mat);
@@ -414,7 +435,7 @@ struct GltfProgram : Program {
                 * inverse(transform(cube_shadow_map_views[face_i]))
                 * inverse(agl::translation(point_light.position));
 
-                for(auto& p : database.primitives) {
+                for(auto [_, p] : scene.primitives) {
                     bind(p.vertex_array);
                     auto mvp = vp * m;
                     uniform(cube_shadow_map_mat.program, "far", 1000.f);
@@ -437,7 +458,7 @@ struct GltfProgram : Program {
             clear(g_buffer.opengl, agl::depth_tag, 1.f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-            for(auto& p : database.primitives) {
+            for(auto [_, p] : scene.primitives) {
                 bind(p);
 
                 uniform(p.material.program, "mv", v * m);

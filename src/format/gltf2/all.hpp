@@ -13,19 +13,21 @@ struct Content {
     std::map<int, agl::Buffer> buffers = {};
     std::map<int, agl::Texture> images = {};
     std::map<int, eng::Material> materials = {};
+    std::map<int, eng::Mesh> meshes = {};
+    std::map<int, eng::Primitive> primitives = {};
     std::map<int, eng::Texture> textures = {};
 };
 
 inline
-auto fill(eng::Database& database, tinygltf::Model& model) {
+auto fill(tinygltf::Model& model) {
     auto content = Content();
 
     { // Converting buffers.
         for(std::size_t i = 0; i < size(model.buffers); ++i) {
             auto b = agl::create(agl::buffer_tag);
             agl::storage(b, std::span(model.buffers[i].data));
-            content.buffers[static_cast<int>(i)] = b;
-            database.gl_buffers[i] = b;
+
+            content.buffers[static_cast<int>(i)] = std::move(b);
         }
     }
 
@@ -60,22 +62,29 @@ auto fill(eng::Database& database, tinygltf::Model& model) {
                 std::as_bytes(std::span(image.image)));
             agl::generate_mipmap(t);
             glFlush();
-            content.images[static_cast<int>(i)] = t;
-            database.gl_textures.push_back(t);
+
+            content.images[static_cast<int>(i)] = std::move(t);
         }
     }
 
     { // Converting textures.
         for(std::size_t i = 0; i < size(model.textures); ++i) {
             auto& texture = model.textures[i];
-            content.textures[static_cast<int>(i)] = { content.images.at(texture.source) };
+
+            content.textures[static_cast<int>(i)] = {
+                content.images.at(texture.source) };
         }
     }
 
     { // Converting materials.
         for(std::size_t i = 0; i < size(model.materials); ++i) {
             auto& material = model.materials[i];
-            auto eng_material = database.default_material;
+            auto eng_material = eng::Material();
+
+            eng_material.program.capabilities.emplace_back(
+                agl::Capability::depth_test, []() {
+                    glDepthFunc(GL_LESS); });
+
             { // 'doubleSided'.
                 if(!material.doubleSided) {
                     eng_material.program.capabilities.push_back({
@@ -88,39 +97,29 @@ auto fill(eng::Database& database, tinygltf::Model& model) {
                 { // 'baseColorTexture'.
                     auto& baseColorTexture = pbrMetallicRoughness.baseColorTexture;
                     if(baseColorTexture.index != -1) {
-                        eng_material.textures.emplace(
-                            "baseColorTexture",
-                            content.textures.at(baseColorTexture.index).texture);
-                    } else {
-                        eng_material.textures.emplace(
-                            "baseColorTexture",
-                            database.default_albedo_map);
+                        eng_material.textures["baseColorTexture"]
+                        = content.textures.at(baseColorTexture.index).texture;
                     }
                 }
             }
             { // 'normalTexture'.
                 auto& normalTexture = material.normalTexture;  
                 if(normalTexture.index != -1) {
-                    eng_material.textures.emplace(
-                            "normalTexture",
-                            content.textures.at(normalTexture.index).texture);
-                } else {
-                    eng_material.textures.emplace(
-                            "normalTexture",
-                            database.default_normal_map);
+                    eng_material.textures["normalTexture"]
+                    = content.textures.at(normalTexture.index).texture;
                 }
             }
-            database.materials.push_back(std::move(eng_material));
-            content.materials[static_cast<int>(i)] = database.materials.back();
+            
+            content.materials[static_cast<int>(i)] = std::move(eng_material);
         }
     }
 
     { // Converting accessors.
         for(std::size_t i = 0; i < size(model.accessors); ++i) {
             auto& accessor = model.accessors[i];
-
             auto eng_accessor = eng::Accessor();
 
+            eng_accessor.component_type = accessor.componentType;
             eng_accessor.byte_offset = agl::Offset<GLuint>(static_cast<GLuint>(accessor.byteOffset));
             eng_accessor.normalized = agl::Normalized(accessor.normalized);
 
@@ -144,13 +143,18 @@ auto fill(eng::Database& database, tinygltf::Model& model) {
 
             auto& buffer_view = model.bufferViews[accessor.bufferView];
 
+            eng_accessor.buffer_view_byte_offset
+            = agl::Offset<GLintptr>(static_cast<GLintptr>(buffer_view.byteOffset));
             eng_accessor.buffer_view_byte_stride
             = agl::Stride<GLsizei>(static_cast<GLsizei>(buffer_view.byteStride));
 
             if(eng_accessor.buffer_view_byte_stride.value == 0) {
-                switch(accessor.componentType) {
+                switch(eng_accessor.component_type) {
                 case GL_FLOAT:
                     eng_accessor.component_size = 4;
+                    break;
+                case GL_UNSIGNED_SHORT:
+                    eng_accessor.component_size = 2;
                     break;
                 default:
                     throw std::runtime_error("Unhandled component type.");
@@ -162,70 +166,47 @@ auto fill(eng::Database& database, tinygltf::Model& model) {
                     * eng_accessor.component_size);
             }
 
+            eng_accessor.buffer = content.buffers.at(buffer_view.buffer);
+
             content.accessors[static_cast<int>(i)] = std::move(eng_accessor);
         }
     }
-
     { // Converting primitives.
-        for(auto& mesh : model.meshes)
-        for(auto& primitive : mesh.primitives) {
-            auto p = eng::Primitive();
-            {
-                p.draw_mode = static_cast<agl::DrawMode>(primitive.mode);
-            }
-            auto gl_vertex_array = p.vertex_array = agl::vertex_array();
-            { // Indices.
-                auto& accessor = model.accessors[primitive.indices];
-                auto& buffer_view = model.bufferViews[accessor.bufferView];
-                p.draw_type = static_cast<agl::DrawType>(accessor.componentType);
-                p.offset = buffer_view.byteOffset;
-                p.primitive_count = agl::Count<GLsizei>(
-                    static_cast<GLsizei>(accessor.count));
-                agl::element_buffer(
-                    gl_vertex_array,
-                    content.buffers.at(buffer_view.buffer));
-            }
-            auto& material = (p.material = content.materials.at(primitive.material));
-            for(int i = 0; i < agl::active_attributes(material.program.program); ++i) {
-                auto ai = agl::AttributeIndex(i);
-                auto aa = agl::active_attrib(material.program.program, ai);
-                auto bi = agl::BindingIndex<GLuint>(i);
-                attribute_binding(gl_vertex_array, ai, bi);
+        for(std::size_t j = 0; j < size(model.meshes); ++j) {
+            auto& mesh = model.meshes[j];
 
-                auto it = primitive.attributes.find(aa.name);
-                if(it != end(primitive.attributes)) {
-                    auto& accessor = content.accessors.at(it->second);
+            auto eng_mesh = eng::Mesh();
 
-                    attribute_format(gl_vertex_array, ai,
-                        accessor.component_count,
-                        accessor.component_type,
-                        accessor.normalized,
-                        accessor.byte_offset);
-                    
-                    auto stride = agl::Stride<GLsizei>(static_cast<GLsizei>(buffer_view.byteStride));
-                    auto component_byte_size = 0;
-                    if(stride.value == 0) {
-                        switch(accessor.componentType) {
-                        case GL_FLOAT:
-                            component_byte_size = 4;
-                            break;
-                        default:
-                            throw std::runtime_error("Unhandled component type.");
-                            break;
-                        }
-                        stride = agl::Stride<GLsizei>(size.value * component_byte_size);
-                    }
-
-                    vertex_buffer(gl_vertex_array, bi,
-                            content.buffers[buffer_view.buffer], 
-                            agl::Offset<GLintptr>(buffer_view.byteOffset),
-                            stride);
-                    enable(gl_vertex_array, ai);
-                } else {
-                    // throw std::runtime_error("Failed to find attribute.");
+            for(auto& primitive : mesh.primitives) {
+                auto eng_primitive = eng::Primitive();
+                {
+                    eng_primitive.draw_mode = static_cast<agl::DrawMode>(primitive.mode);
                 }
+                auto gl_vertex_array = eng_primitive.vertex_array = agl::vertex_array();
+
+                { // Indices.
+                    auto& accessor = model.accessors[primitive.indices];
+                    auto& buffer_view = model.bufferViews[accessor.bufferView];
+                    eng_primitive.draw_type = static_cast<agl::DrawType>(accessor.componentType);
+                    eng_primitive.offset = buffer_view.byteOffset;
+                    eng_primitive.primitive_count = agl::Count<GLsizei>(
+                        static_cast<GLsizei>(accessor.count));
+                    agl::element_buffer(
+                        gl_vertex_array,
+                        content.buffers.at(buffer_view.buffer));
+                }
+
+                eng_primitive.material = content.materials.at(primitive.material);
+
+
+                for(auto [name, id] : primitive.attributes) {
+                    eng_primitive.attributes[name] = content.accessors.at(id);
+                }
+
+                content.primitives[static_cast<int>(size(content.primitives))] = std::move(eng_primitive);
             }
-            database.primitives.push_back(std::move(p));
+
+            // content.meshes[static_cast<int>(j)] = std::move(mesh);
         }
     }
 

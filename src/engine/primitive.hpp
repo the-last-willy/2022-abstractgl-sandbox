@@ -3,6 +3,7 @@
 #include "accessor.hpp"
 #include "material.hpp"
 
+#include <stdexcept>
 #include <string>
 
 namespace eng {
@@ -25,18 +26,59 @@ struct Primitive {
 };
 
 inline
-void bind(const Primitive& p) {
+void bind(Primitive& p) {
+    bind(p.vertex_array);
     bind(p.material);
+}
+
+inline
+void unbind(Primitive& p) {
+    unbind(p.material);
+} 
+
+inline
+void bind(Primitive& p, const Material& m) {
+    for(int i = 0; i < agl::active_attributes(m.program.program); ++i) {
+        auto ai = agl::AttributeIndex(i);
+        auto aa = agl::active_attrib(m.program.program, ai);
+        auto bi = agl::BindingIndex<GLuint>(i);
+        attribute_binding(p.vertex_array, ai, bi);
+
+        auto it = p.attributes.find(aa.name);
+        if(it != end(p.attributes)) {
+            auto& accessor = it->second;
+            attribute_format(
+                p.vertex_array, ai,
+                accessor.component_count,
+                accessor.component_type,
+                accessor.normalized,
+                accessor.byte_offset);
+            vertex_buffer(
+                p.vertex_array, bi,
+                accessor.buffer,
+                accessor.buffer_view_byte_offset,
+                accessor.buffer_view_byte_stride);
+            enable(p.vertex_array, ai);
+        } else {
+            // std::cout << "Missing " << aa.name << std::endl;
+            // throw std::runtime_error("Missing vertex attribute.");
+        }
+    }
     bind(p.vertex_array);
 }
 
 inline
-void unbind(const Primitive& p) {
-    unbind(p.material);
+void unbind(const Primitive& p, const Material& m) {
+    unbind(agl::vertex_array_tag);
+    for(int i = 0; i < agl::active_attributes(m.program.program); ++i) {
+        auto ai = agl::AttributeIndex(i);
+        disable(p.vertex_array, ai);
+    }
 }
 
 inline
 void render(const Primitive& p) {
+    auto b = agl::element_array_buffer_binding(p.vertex_array);
     if(agl::element_array_buffer_binding(p.vertex_array)) {
         agl::draw_elements(
             p.draw_mode,
