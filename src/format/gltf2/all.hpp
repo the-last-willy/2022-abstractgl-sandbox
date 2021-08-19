@@ -1,10 +1,12 @@
 #pragma once
 
+#include <common/all.hpp>
 #include <engine/all.hpp>
 
 #include <tiny_gltf.h>
 
 #include <map>
+#include <memory>
 
 namespace format::gltf2 {
 
@@ -13,8 +15,9 @@ struct Content {
     std::map<int, agl::Buffer> buffers = {};
     std::map<int, agl::Texture> images = {};
     std::map<int, eng::Material> materials = {};
-    std::map<int, eng::Mesh> meshes = {};
-    std::map<int, eng::Primitive> primitives = {};
+    std::map<int, std::shared_ptr<eng::Mesh>> meshes = {};
+    std::map<int, std::shared_ptr<eng::Node>> nodes = {};
+    std::map<int, std::shared_ptr<eng::Scene>> scenes = {};
     std::map<int, eng::Texture> textures = {};
 };
 
@@ -92,14 +95,11 @@ auto fill(tinygltf::Model& model) {
                             glCullFace(GL_FRONT); }});
                 }
             }
-            { // 'pbrMetallicRoughness'.
-                auto& pbrMetallicRoughness = material.pbrMetallicRoughness;  
-                { // 'baseColorTexture'.
-                    auto& baseColorTexture = pbrMetallicRoughness.baseColorTexture;
-                    if(baseColorTexture.index != -1) {
-                        eng_material.textures["baseColorTexture"]
-                        = content.textures.at(baseColorTexture.index).texture;
-                    }
+            { // 'emissiveTexture'.
+                auto& et = material.emissiveTexture;  
+                if(et.index != -1) {
+                    eng_material.textures["emissiveTexture"]
+                    = content.textures.at(et.index).texture;
                 }
             }
             { // 'normalTexture'.
@@ -109,7 +109,32 @@ auto fill(tinygltf::Model& model) {
                     = content.textures.at(normalTexture.index).texture;
                 }
             }
-            
+            { // 'pbrMetallicRoughness'.
+                auto& pmr = material.pbrMetallicRoughness;
+                { // 'baseColorFactor'.
+                    auto& bcf = pmr.baseColorFactor;
+                    eng_material.uniforms["baseColorFactor"]
+                    = new eng::Uniform<agl::Vec4>(agl::vec4(
+                        static_cast<float>(bcf[0]),
+                        static_cast<float>(bcf[1]),
+                        static_cast<float>(bcf[2]),
+                        static_cast<float>(bcf[3])));
+                } 
+                { // 'baseColorTexture'.
+                    auto& baseColorTexture = pmr.baseColorTexture;
+                    if(baseColorTexture.index != -1) {
+                        eng_material.textures["baseColorTexture"]
+                        = content.textures.at(baseColorTexture.index).texture;
+                    }
+                }
+                { // 'metallicRoughnessTexture'.
+                    auto& mrt = pmr.metallicRoughnessTexture;
+                    if(mrt.index != -1) {
+                        eng_material.textures["metallicRoughnessTexture"]
+                        = content.textures.at(mrt.index).texture;
+                    }
+                }
+            }
             content.materials[static_cast<int>(i)] = std::move(eng_material);
         }
     }
@@ -171,11 +196,12 @@ auto fill(tinygltf::Model& model) {
             content.accessors[static_cast<int>(i)] = std::move(eng_accessor);
         }
     }
-    { // Converting primitives.
-        for(std::size_t j = 0; j < size(model.meshes); ++j) {
-            auto& mesh = model.meshes[j];
-
-            auto eng_mesh = eng::Mesh();
+    { // Converting meshes and primitives.
+        for(std::size_t i = 0; i < size(model.meshes); ++i) {
+            auto& mesh = model.meshes[i];
+            auto& eng_mesh
+            = *(content.meshes[static_cast<int>(i)]
+                = std::make_shared<eng::Mesh>());
 
             for(auto& primitive : mesh.primitives) {
                 auto eng_primitive = eng::Primitive();
@@ -203,10 +229,62 @@ auto fill(tinygltf::Model& model) {
                     eng_primitive.attributes[name] = content.accessors.at(id);
                 }
 
-                content.primitives[static_cast<int>(size(content.primitives))] = std::move(eng_primitive);
+                eng_mesh.primitives.emplace_back(
+                    std::make_shared<eng::Primitive>(eng_primitive));
+            }
+        }
+    }
+    { // Converting nodes.
+        for(std::size_t i = 0; i < size(model.nodes); ++i) {
+            content.nodes[static_cast<int>(i)] = std::make_shared<eng::Node>();
+        }
+        for(std::size_t i = 0; i < size(model.nodes); ++i) {
+            auto& node = model.nodes[i];
+            auto& eng_node = *content.nodes[static_cast<int>(i)];
+
+            for(auto c : node.children) {
+                eng_node.children.push_back(content.nodes.at(c));
             }
 
-            // content.meshes[static_cast<int>(j)] = std::move(mesh);
+            if(size(node.matrix) == 16) {
+                std::cout << "Node matrix not implemented." << std::endl;
+            } else {
+                if(size(node.translation) == 3) {
+                    eng_node.transform = eng_node.transform * agl::translation(
+                        static_cast<float>(node.translation[0]),
+                        static_cast<float>(node.translation[1]),
+                        static_cast<float>(node.translation[2]));
+                }
+                if(size(node.scale) == 3) {
+                    eng_node.transform = eng_node.transform *  agl::scaling3(
+                        static_cast<float>(node.scale[0]),
+                        static_cast<float>(node.scale[1]),
+                        static_cast<float>(node.scale[2]));
+                }
+
+                if(size(node.rotation) > 0) {
+                    std::cout << "Node rotation not implemented." << std::endl;
+                }
+            }
+
+            if(node.mesh != -1) {
+                eng_node.mesh = content.meshes.at(node.mesh);
+            }
+
+            
+        }
+    }
+    { // Converting scenes.
+        for(std::size_t i = 0; i < size(model.scenes); ++i) {
+            auto& scene = model.scenes[i];
+
+            auto& eng_scene
+            = *(content.scenes[static_cast<int>(i)]
+                = std::make_shared<eng::Scene>());
+            
+            for(auto n : scene.nodes) {
+                eng_scene.nodes.push_back(content.nodes.at(n));
+            }
         }
     }
 

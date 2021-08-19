@@ -2,6 +2,8 @@
 
 #include <agl/all.hpp>
 
+namespace eng {
+
 struct AnyUniform {
     virtual ~AnyUniform() = default;
 
@@ -21,3 +23,5 @@ struct Uniform : AnyUniform {
         agl::uniform(p, ui, value);
     }
 };
+
+}

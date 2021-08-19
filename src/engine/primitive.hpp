@@ -26,13 +26,13 @@ struct Primitive {
 };
 
 inline
-void bind(Primitive& p) {
+void bind(const Primitive& p) {
     bind(p.vertex_array);
     bind(p.material);
 }
 
 inline
-void unbind(Primitive& p) {
+void unbind(const Primitive& p) {
     unbind(p.material);
 } 
 
@@ -52,11 +52,11 @@ void bind(Primitive& p, const Material& m) {
                 accessor.component_count,
                 accessor.component_type,
                 accessor.normalized,
-                accessor.byte_offset);
+                agl::Offset<GLuint>(0));
             vertex_buffer(
                 p.vertex_array, bi,
                 accessor.buffer,
-                accessor.buffer_view_byte_offset,
+                agl::Offset<GLintptr>(accessor.buffer_view_byte_offset.value + accessor.byte_offset.value),
                 accessor.buffer_view_byte_stride);
             enable(p.vertex_array, ai);
         } else {

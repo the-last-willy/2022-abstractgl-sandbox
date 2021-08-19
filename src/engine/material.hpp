@@ -1,11 +1,13 @@
 #pragma once
 
 #include "program.hpp"
+#include "uniform.hpp"
 
 #include <agl/all.hpp>
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <tuple>
 
 namespace eng {
@@ -14,6 +16,8 @@ struct Material {
     eng::Program program = {};
 
     std::map<std::string, agl::Texture> textures = {};
+
+    std::map<std::string, AnyUniform*> uniforms = {};
 
     std::function<void()> on_bind = [](){};
 };

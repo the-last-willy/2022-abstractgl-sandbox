@@ -53,6 +53,8 @@ struct GltfProgram : Program {
     eng::Framebuffer g_buffer = {};
     agl::Texture albedo_texture = {};
     agl::Texture depth_texture = {};
+    agl::Texture emissive_texture = {};
+    agl::Texture metallic_roughness_texture = {};
     agl::Texture normal_texture = {};
     agl::Texture position_texture = {};
 
@@ -136,7 +138,10 @@ struct GltfProgram : Program {
 
         bool ret = loader.LoadASCIIFromFile(
             &model, &err, &warn, 
-            "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
+            // "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
+            "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf"
+            // "D:/data/sample/gltf2/Buggy/glTF/Buggy.gltf"
+            // "D:/data/sample/gltf2/ReciprocatingSaw/glTF/ReciprocatingSaw.gltf"
             );
 
         if (!warn.empty()) {
@@ -154,9 +159,14 @@ struct GltfProgram : Program {
 
         scene = format::gltf2::fill(model);
 
+        { // Precomputing model transforms.
+
+        }
+
         { // Normalizing materials.
-            for(auto& [_, p] : scene.primitives) {
-                auto& m = p.material;
+            for(auto& mesh : scene.meshes | std::views::values | common::views::indirect)
+            for(auto& primitive : mesh.primitives | common::views::indirect) {
+                auto& m = primitive.material;
                 m.program.program = database.default_material.program.program;
 
                 if(!m.textures.contains("baseColorTexture")) {
@@ -169,8 +179,9 @@ struct GltfProgram : Program {
         }
 
         { // Vertex attribute plumbing.
-            for(auto& [_, p] : scene.primitives) {
-                bind(p, p.material);
+            for(auto& mesh : scene.meshes | std::views::values | common::views::indirect)
+            for(auto& primitive : mesh.primitives | common::views::indirect) {
+                bind(primitive, primitive.material);
             }
         }
 
@@ -196,6 +207,24 @@ struct GltfProgram : Program {
                     agl::depth_tag,
                     depth_texture);
             }
+            { // Emissive texture.
+                emissive_texture = agl::create(agl::TextureTarget::_2d);
+                storage(
+                    emissive_texture, GL_R11F_G11F_B10F,
+                    agl::Width(window.width()), agl::Height(window.height()));
+                texture(g_buffer.opengl,
+                    agl::ColorAttachment(1),
+                    emissive_texture);
+            }
+            { // Metallic roughness texture.
+                metallic_roughness_texture = agl::create(agl::TextureTarget::_2d);
+                storage(
+                    metallic_roughness_texture, GL_R11F_G11F_B10F,
+                    agl::Width(window.width()), agl::Height(window.height()));
+                texture(g_buffer.opengl,
+                    agl::ColorAttachment(2),
+                    metallic_roughness_texture);
+            }
             { // Normal texture.
                 normal_texture = agl::create(agl::TextureTarget::_2d);
                 mag_filter(normal_texture, GL_LINEAR);
@@ -204,7 +233,7 @@ struct GltfProgram : Program {
                     normal_texture, GL_RGB32F,
                     agl::Width(window.width()), agl::Height(window.height()));
                 texture(g_buffer.opengl,
-                    agl::ColorAttachment(1),
+                    agl::ColorAttachment(3),
                     normal_texture);
             }
             { // Position texture. 
@@ -215,13 +244,15 @@ struct GltfProgram : Program {
                     position_texture, GL_RGB32F,
                     agl::Width(window.width()), agl::Height(window.height()));
                 texture(g_buffer.opengl,
-                    agl::ColorAttachment(2),
+                    agl::ColorAttachment(4),
                     position_texture);
             }
-            auto fbs = std::array<agl::FramebufferDrawBuffer, 3>{
+            auto fbs = std::array<agl::FramebufferDrawBuffer, 5>{
                 agl::ColorAttachment(0),
                 agl::ColorAttachment(1),
-                agl::ColorAttachment(2),};
+                agl::ColorAttachment(2),
+                agl::ColorAttachment(3),
+                agl::ColorAttachment(4),};
             draw_buffers(g_buffer.opengl, std::span(fbs));
         }
         
@@ -267,6 +298,7 @@ struct GltfProgram : Program {
         { // Ambient light.
             ambient_light_mat = gltf::ambient_lighting_material();
             ambient_light_mat.textures["albedo_texture"] = albedo_texture;
+            ambient_light_mat.textures["emissive_texture"] = emissive_texture;
             ambient_light_mat.textures["normal_texture"] = normal_texture;
             ambient_light_mat.textures["position_texture"] = position_texture;
         }
@@ -331,19 +363,19 @@ struct GltfProgram : Program {
         {
             if(glfwGetKey(window.window, GLFW_KEY_A)) {
                 auto direction = (rotation(view) * agl::rotation_y(agl::pi / 2.f))[2].xyz();
-                view.position = view.position - direction;
+                view.position = view.position - direction / 10.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_D)) {
                 auto direction = (rotation(view) * agl::rotation_y(-agl::pi / 2.f))[2].xyz();
-                view.position = view.position - direction;
+                view.position = view.position - direction / 10.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_S)) {
                 auto direction = rotation(view)[2].xyz();
-                view.position = view.position - direction;
+                view.position = view.position - direction / 10.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_W)) {
                 auto direction = rotation(view)[2].xyz();
-                view.position = view.position + direction;
+                view.position = view.position + direction / 10.f;
             }
         }
 
@@ -373,8 +405,13 @@ struct GltfProgram : Program {
     }
 
     void render() override {
-
-        auto m = agl::scaling3(0.1f);
+        auto traverse_scene = [](eng::Node& n, auto f) {
+            traverse(n, [f](const eng::Mesh& m, const agl::Mat4& transform) {
+                for(auto& primitive : m.primitives | common::views::indirect) {
+                    f(primitive, transform);
+                }
+            });
+        };
 
         if constexpr(false) { // Shadow map.
             texture(
@@ -384,15 +421,16 @@ struct GltfProgram : Program {
 
             bind(shadow_map_fb);
             clear(shadow_map_fb);
-            
-            auto mvp = dir_light.transform * m;
 
             bind(shadow_map_mat);
-            for(auto [_, p] : scene.primitives) {
-                bind(p);
-                uniform(shadow_map_mat.program, "mvp", mvp);
-                eng::render(p);
-                unbind(p);
+            for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+                traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
+                    bind(primitive);
+                    auto mvp = dir_light.transform * transform;
+                    uniform(shadow_map_mat.program, "mvp", mvp);
+                    eng::render(primitive);
+                    unbind(primitive);
+                });
             }
             unbind(shadow_map_mat);
         }
@@ -405,15 +443,16 @@ struct GltfProgram : Program {
 
             bind(shadow_map_fb);
             clear(shadow_map_fb);
-            
-            auto mvp = spot_light.transform * m;
 
             bind(shadow_map_mat);
-            for(auto [_, p]: scene.primitives) {
-                bind(p.vertex_array);
-                uniform(shadow_map_mat.program, "mvp", mvp);
-                eng::render(p);
-                unbind(p, shadow_map_mat);
+            for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+                traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
+                    bind(primitive.vertex_array);
+                    auto mvp = spot_light.transform * transform;
+                    uniform(shadow_map_mat.program, "mvp", mvp);
+                    eng::render(primitive);
+                    unbind(primitive, shadow_map_mat);
+                });
             }
             unbind(shadow_map_mat);
         }
@@ -435,12 +474,14 @@ struct GltfProgram : Program {
                 * inverse(transform(cube_shadow_map_views[face_i]))
                 * inverse(agl::translation(point_light.position));
 
-                for(auto [_, p] : scene.primitives) {
-                    bind(p.vertex_array);
-                    auto mvp = vp * m;
-                    uniform(cube_shadow_map_mat.program, "far", 1000.f);
-                    uniform(cube_shadow_map_mat.program, "mvp", mvp);
-                    eng::render(p);
+                for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+                    traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
+                        bind(primitive.vertex_array);
+                        auto mvp = vp * transform;
+                        uniform(cube_shadow_map_mat.program, "far", 1000.f);
+                        uniform(cube_shadow_map_mat.program, "mvp", mvp);
+                        eng::render(primitive);
+                    });
                 }
             }
             unbind(cube_shadow_map_mat);
@@ -449,7 +490,7 @@ struct GltfProgram : Program {
         auto inv_v = transform(view);
         auto v = inverse(inv_v);
 
-        auto mvp = transform(projection) * v * m;
+        auto vp = transform(projection) * v;
         auto normal_transform = transpose(inv_v);
 
         { // G buffer.
@@ -458,16 +499,15 @@ struct GltfProgram : Program {
             clear(g_buffer.opengl, agl::depth_tag, 1.f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-            for(auto [_, p] : scene.primitives) {
-                bind(p);
-
-                uniform(p.material.program, "mv", v * m);
-                uniform(p.material.program, "mvp", mvp);
-                uniform(p.material.program, "normal_transform", normal_transform);
-
-                eng::render(p);
-
-                unbind(p);
+            for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+                traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
+                    bind(primitive);
+                    uniform(primitive.material.program, "mv", v * transform);
+                    uniform(primitive.material.program, "mvp", vp * transform);
+                    uniform(primitive.material.program, "normal_transform", normal_transform);
+                    eng::render(primitive);
+                    unbind(primitive);
+                });
             }
         }
 
