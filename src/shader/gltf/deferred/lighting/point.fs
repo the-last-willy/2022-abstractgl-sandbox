@@ -38,7 +38,7 @@ void main() {
     float fragment_depth = length(position - light_position);
 
     float shadow_bias = .0005 * light_distance;;
-    float shadow = 1. - min((1. - float(light_depth + shadow_bias < fragment_depth)) / fragment_depth * 100., 1.);
+    bool shadow = light_depth + shadow_bias < fragment_depth;
 
     float lambertian = max(dot(normal, -light_direction_vs), 0.);
     vec3 diffuse = lambertian * albedo;
@@ -46,5 +46,5 @@ void main() {
     float shininess = 64.;
     float specular = pow(max(dot(view_direction, -normalize(reflect(light_direction_vs, normal))), 0.), shininess);
 
-    fragment_rgb = (1. - shadow) * (.7 * diffuse + .5 * specular);
+    fragment_rgb = (shadow ? vec3(0.) : 1. * diffuse) + .5 * specular;
 }

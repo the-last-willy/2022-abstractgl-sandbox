@@ -5,6 +5,8 @@ uniform sampler2D emissiveTexture;
 uniform sampler2D metallicRoughnessTexture;
 uniform sampler2D normalTexture;
 
+uniform vec4 baseColorFactor = vec4(1., 1., 1., 1.);
+
 in vec3 vertex_normal;
 in vec3 vertex_position;
 in vec4 vertex_tangent;
@@ -28,7 +30,7 @@ void main() {
     normal = tbn * normal_mapping;
 
     {
-        vec4 albedo = texture(baseColorTexture, vertex_texcoord);
+        vec4 albedo = baseColorFactor * texture(baseColorTexture, vertex_texcoord);
         if(albedo.a < .6) {
             discard;
         } else {

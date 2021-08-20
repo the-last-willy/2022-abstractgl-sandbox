@@ -19,4 +19,5 @@ void main() {
     // float factor = .5 * (1. - min(length(position) / 100., 1.));
     float factor = .5;
     fragment_rgb = emissive + factor * albedo;
+    // fragment_rgb = texture(normal_texture, vertex_texcoords).rgb * .5 + .5;
 }

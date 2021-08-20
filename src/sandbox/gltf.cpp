@@ -49,6 +49,9 @@ struct GltfProgram : Program {
     // glTF file.
     format::gltf2::Content scene = {};
 
+    // Default textures.
+    agl::Texture default_emissive_tex;
+
     // G buffer.
     eng::Framebuffer g_buffer = {};
     agl::Texture albedo_texture = {};
@@ -106,12 +109,12 @@ struct GltfProgram : Program {
                 database.default_albedo_map = agl::create(agl::TextureTarget::_2d);
                 storage(
                     database.default_albedo_map,
-                    GL_RGB32F, agl::Width(1), agl::Height(1));
-                auto rgb = std::array{agl::vec3(0.5f, 0.5f, 0.5f)};
+                    GL_RGB8, agl::Width(1), agl::Height(1));
+                auto rgb = std::array{agl::vec3(1.f, 1.f, 1.f)};
                 image(
                     database.default_albedo_map,
                     agl::Level(0),
-                    0, 0, agl::Width(0), agl::Height(0),
+                    0, 0, agl::Width(1), agl::Height(1),
                     GL_RGB, GL_FLOAT,
                     as_bytes(std::span(rgb)));
             }
@@ -129,6 +132,19 @@ struct GltfProgram : Program {
                     as_bytes(std::span(normal)));
             }
         }
+        { // Default emissive texture.
+            default_emissive_tex = create(agl::TextureTarget::_2d);
+            storage(
+                default_emissive_tex,
+                GL_RGB8, agl::Width(1), agl::Height(1));
+            auto rgb = std::array{agl::vec3(0.f, 0.f, 0.f)};
+            image(
+                default_emissive_tex,
+                agl::Level(0),
+                0, 0, agl::Width(1), agl::Height(1),
+                GL_RGB, GL_FLOAT,
+                as_bytes(std::span(rgb)));
+        }
 
         tinygltf::TinyGLTF loader;
         tinygltf::Model model;
@@ -138,8 +154,12 @@ struct GltfProgram : Program {
 
         bool ret = loader.LoadASCIIFromFile(
             &model, &err, &warn, 
-            // "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
-            "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf"
+            "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
+            // "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf"
+            // "D:/data/sample/gltf2/MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf"
+            // "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf"
+            // "D:/data/sample/gltf2/OrientationTest/glTF/OrientationTest.gltf"
+            // "D:/data/sample/gltf2/boom_box_with_axes/BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf"
             // "D:/data/sample/gltf2/Buggy/glTF/Buggy.gltf"
             // "D:/data/sample/gltf2/ReciprocatingSaw/glTF/ReciprocatingSaw.gltf"
             );
@@ -166,11 +186,19 @@ struct GltfProgram : Program {
         { // Normalizing materials.
             for(auto& mesh : scene.meshes | std::views::values | common::views::indirect)
             for(auto& primitive : mesh.primitives | common::views::indirect) {
-                auto& m = primitive.material;
+                if(!primitive.material) {
+                    primitive.material = eng::Material();
+                }
+
+                auto& m = *primitive.material;
+
                 m.program.program = database.default_material.program.program;
 
                 if(!m.textures.contains("baseColorTexture")) {
                     m.textures["baseColorTexture"] = database.default_albedo_map;
+                }
+                if(!m.textures.contains("emissiveTexture")) {
+                    m.textures["emissiveTexture"] = default_emissive_tex;
                 }
                 if(!m.textures.contains("normalTexture")) {
                     m.textures["normalTexture"] = database.default_normal_map;
@@ -181,7 +209,7 @@ struct GltfProgram : Program {
         { // Vertex attribute plumbing.
             for(auto& mesh : scene.meshes | std::views::values | common::views::indirect)
             for(auto& primitive : mesh.primitives | common::views::indirect) {
-                bind(primitive, primitive.material);
+                bind(primitive, *primitive.material);
             }
         }
 
@@ -491,7 +519,6 @@ struct GltfProgram : Program {
         auto v = inverse(inv_v);
 
         auto vp = transform(projection) * v;
-        auto normal_transform = transpose(inv_v);
 
         { // G buffer.
             glViewport(0, 0, window.width(), window.height());
@@ -501,12 +528,22 @@ struct GltfProgram : Program {
 
             for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
                 traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
-                    bind(primitive);
-                    uniform(primitive.material.program, "mv", v * transform);
-                    uniform(primitive.material.program, "mvp", vp * transform);
-                    uniform(primitive.material.program, "normal_transform", normal_transform);
-                    eng::render(primitive);
-                    unbind(primitive);
+                    if(primitive.material) {
+                        auto& m = *primitive.material;
+                        bind(primitive);
+                        auto mv = v * transform;
+                        uniform(m.program, "mv", mv);
+                        uniform(m.program, "mvp", vp * transform);
+                        auto normal_transform = transpose(inverse(mv));
+                        // TERRIBLENESS. RIGHT HANADED TO LEFT HANDED BY FLIPPING Z AXIS.
+                        // normal_transform[0][2] *= -1.f;
+                        // normal_transform[1][2] *= -1.f;
+                        // normal_transform[2][2] *= -1.f;
+                        // normal_transform[3][2] *= -1.f;
+                        uniform(m.program, "normal_transform", normal_transform);
+                        eng::render(primitive);
+                        unbind(primitive);
+                    }
                 });
             }
         }

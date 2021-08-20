@@ -178,6 +178,9 @@ auto fill(tinygltf::Model& model) {
                 case GL_FLOAT:
                     eng_accessor.component_size = 4;
                     break;
+                case GL_UNSIGNED_BYTE:
+                    eng_accessor.component_size = 1;
+                    break;
                 case GL_UNSIGNED_SHORT:
                     eng_accessor.component_size = 2;
                     break;
@@ -213,17 +216,36 @@ auto fill(tinygltf::Model& model) {
                 { // Indices.
                     auto& accessor = model.accessors[primitive.indices];
                     auto& buffer_view = model.bufferViews[accessor.bufferView];
-                    eng_primitive.draw_type = static_cast<agl::DrawType>(accessor.componentType);
-                    eng_primitive.offset = buffer_view.byteOffset;
-                    eng_primitive.primitive_count = agl::Count<GLsizei>(
-                        static_cast<GLsizei>(accessor.count));
-                    agl::element_buffer(
-                        gl_vertex_array,
-                        content.buffers.at(buffer_view.buffer));
+                    if(accessor.componentType == GL_UNSIGNED_BYTE) {
+                        auto& buffer = model.buffers[buffer_view.buffer];
+                        auto short_data = std::vector<GLushort>(accessor.count);
+                        auto offset = accessor.byteOffset + buffer_view.byteOffset;
+                        for(std::size_t i = 0; i < size(short_data); ++i) {
+                            short_data[i] = buffer.data[offset + i];
+                        }
+                        auto eng_buffer = agl::create(agl::buffer_tag);
+                        storage(eng_buffer, std::span(short_data));
+                        eng_primitive.draw_type = static_cast<agl::DrawType>(GL_UNSIGNED_SHORT);
+                        eng_primitive.offset = 0;
+                        eng_primitive.primitive_count = agl::Count<GLsizei>(
+                            static_cast<GLsizei>(accessor.count));
+                        agl::element_buffer(
+                            gl_vertex_array,
+                            eng_buffer);
+                    } else {
+                        eng_primitive.draw_type = static_cast<agl::DrawType>(accessor.componentType);
+                        eng_primitive.offset = accessor.byteOffset + buffer_view.byteOffset;
+                        eng_primitive.primitive_count = agl::Count<GLsizei>(
+                            static_cast<GLsizei>(accessor.count));
+                        agl::element_buffer(
+                            gl_vertex_array,
+                            content.buffers.at(buffer_view.buffer));
+                    }
                 }
 
-                eng_primitive.material = content.materials.at(primitive.material);
-
+                if(primitive.material != -1) {
+                    eng_primitive.material = content.materials.at(primitive.material);
+                }
 
                 for(auto [name, id] : primitive.attributes) {
                     eng_primitive.attributes[name] = content.accessors.at(id);
@@ -247,7 +269,13 @@ auto fill(tinygltf::Model& model) {
             }
 
             if(size(node.matrix) == 16) {
-                std::cout << "Node matrix not implemented." << std::endl;
+                auto m = [mat = node.matrix](std::size_t i) {
+                    return static_cast<float>(mat[i]); }; 
+                eng_node.transform = eng_node.transform * agl::mat4(
+                    m(0), m(1), m(2), m(3), 
+                    m(4), m(5), m(6), m(7), 
+                    m(8), m(9), m(10), m(11), 
+                    m(12), m(13), m(14), m(15));
             } else {
                 if(size(node.translation) == 3) {
                     eng_node.transform = eng_node.transform * agl::translation(

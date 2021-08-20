@@ -25,14 +25,22 @@ struct Material {
 inline
 void bind_textures(const Material& m) {
     auto unit = 0;
-    for(auto [uniform, texture] : m.textures) {
-        auto ul = uniform_location(m.program.program, uniform.c_str());
+    for(auto [name, texture] : m.textures) {
+        auto ul = uniform_location(m.program.program, name.c_str());
         if(ul) {
             bind(agl::TextureUnit(unit), texture);
             agl::uniform(m.program.program, *ul, unit);
             unit += 1;
-        } else {
-            // std::cout << uniform << std::endl;
+        }
+    }
+}
+
+inline
+void bind_uniforms(const Material& m) {
+    for(auto& [name, value] : m.uniforms) {
+        auto ul = uniform_location(m.program.program, name.c_str());
+        if(ul) {
+            value->set(m.program.program, *ul);
         }
     }
     m.on_bind();
@@ -42,6 +50,8 @@ inline
 void bind(const Material& m) {
     bind(m.program);
     bind_textures(m);
+    bind_uniforms(m);
+    m.on_bind();
 }
 
 inline

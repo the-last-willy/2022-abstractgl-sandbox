@@ -3,6 +3,7 @@
 #include "accessor.hpp"
 #include "material.hpp"
 
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -13,7 +14,7 @@ struct Primitive {
 
     std::map<std::string, eng::Accessor> attributes = {};
 
-    Material material = {};
+    std::optional<Material> material = std::nullopt;
 
     // Indices.
 
@@ -28,12 +29,12 @@ struct Primitive {
 inline
 void bind(const Primitive& p) {
     bind(p.vertex_array);
-    bind(p.material);
+    bind(*p.material);
 }
 
 inline
 void unbind(const Primitive& p) {
-    unbind(p.material);
+    unbind(*p.material);
 } 
 
 inline
