@@ -29,14 +29,14 @@ struct DirectionalLight {
     agl::Vec3 direction = {};
     agl::Mat4 transform = {};
 
-    agl::Texture shadow_map = {};
+    std::shared_ptr<eng::Texture> shadow_map = std::make_shared<eng::Texture>();;
 };
 
 struct SpotLight {
     agl::Vec3 direction = {};
     agl::Mat4 transform = {};
 
-    agl::Texture shadow_map = {};
+    std::shared_ptr<eng::Texture> shadow_map = std::make_shared<eng::Texture>();;
 };
 
 struct PointLight {
@@ -49,20 +49,25 @@ struct GltfProgram : Program {
     // glTF file.
     format::gltf2::Content scene = {};
 
+    // Default sampler.
+    agl::Sampler default_sampler;
+
     // Default textures.
-    agl::Texture default_emissive_tex;
+    std::shared_ptr<eng::Texture> default_albedo_tex = std::make_shared<eng::Texture>();
+    std::shared_ptr<eng::Texture> default_emissive_tex = std::make_shared<eng::Texture>();
+    std::shared_ptr<eng::Texture> default_normal_map_tex = std::make_shared<eng::Texture>();
 
     // G buffer.
     eng::Framebuffer g_buffer = {};
-    agl::Texture albedo_texture = {};
-    agl::Texture depth_texture = {};
-    agl::Texture emissive_texture = {};
-    agl::Texture metallic_roughness_texture = {};
-    agl::Texture normal_texture = {};
-    agl::Texture position_texture = {};
+    std::shared_ptr<eng::Texture> albedo_texture = std::make_shared<eng::Texture>();
+    std::shared_ptr<eng::Texture> depth_texture = std::make_shared<eng::Texture>();
+    std::shared_ptr<eng::Texture> emissive_texture = std::make_shared<eng::Texture>();
+    std::shared_ptr<eng::Texture> metallic_roughness_texture = std::make_shared<eng::Texture>();
+    std::shared_ptr<eng::Texture> normal_texture = std::make_shared<eng::Texture>();
+    std::shared_ptr<eng::Texture> position_texture = std::make_shared<eng::Texture>();
 
     // HDR.
-    agl::Texture hdr_tex = {};
+    std::shared_ptr<eng::Texture> hdr_tex = std::make_shared<eng::Texture>();
     agl::Framebuffer hdr_fb = {}; 
 
     // Skybox.
@@ -78,7 +83,7 @@ struct GltfProgram : Program {
 
     // Cube shadow map.
     int cube_shadow_map_res = 4'096;
-    agl::Texture cube_shadow_map_tex = {};
+    std::shared_ptr<eng::Texture> cube_shadow_map_tex = std::make_shared<eng::Texture>();;
     eng::Material cube_shadow_map_mat = {};
     tlw::PerspectiveProjection cube_shadow_map_proj = {};
     std::array<tlw::View, 6> cube_shadow_map_views = {};
@@ -103,47 +108,58 @@ struct GltfProgram : Program {
     tlw::View view = {};
     
     void init() override {
-        { // Database defaults.
+        { // Default sampler.
+            default_sampler = create(agl::sampler_tag);
+            mag_filter(default_sampler, GL_LINEAR);
+            min_filter(default_sampler, GL_LINEAR);
+        }
+        { // Default textures.
             database.default_material = gltf::g_buffer_material();
-            { // Albedo map.
-                database.default_albedo_map = agl::create(agl::TextureTarget::_2d);
+            { // Albedo.
+                auto& tex = *default_albedo_tex;
+                tex.sampler = default_sampler;
+                tex.texture = create(agl::TextureTarget::_2d);
                 storage(
-                    database.default_albedo_map,
+                    tex.texture,
                     GL_RGB8, agl::Width(1), agl::Height(1));
                 auto rgb = std::array{agl::vec3(1.f, 1.f, 1.f)};
                 image(
-                    database.default_albedo_map,
+                    tex.texture,
+                    agl::Level(0),
+                    0, 0, agl::Width(1), agl::Height(1),
+                    GL_RGB, GL_FLOAT,
+                    as_bytes(std::span(rgb)));
+            }
+            { // Emissive map.
+                auto& tex = *default_emissive_tex;
+                tex.sampler = default_sampler;
+                tex.texture = create(agl::TextureTarget::_2d);
+                storage(
+                    tex.texture,
+                    GL_RGB8, agl::Width(1), agl::Height(1));
+                auto rgb = std::array{agl::vec3(0.f, 0.f, 0.f)};
+                image(
+                    tex.texture,
                     agl::Level(0),
                     0, 0, agl::Width(1), agl::Height(1),
                     GL_RGB, GL_FLOAT,
                     as_bytes(std::span(rgb)));
             }
             { // Normal map.
-                database.default_normal_map = agl::create(agl::TextureTarget::_2d);
+                auto& tex = *default_normal_map_tex;
+                tex.sampler = default_sampler;
+                tex.texture = create(agl::TextureTarget::_2d);
                 storage(
-                    database.default_normal_map,
+                    tex.texture,
                     GL_RGB32F, agl::Width(1), agl::Height(1));
                 auto normal = std::array{agl::vec3(0.f, 0.f, 1.f)};
                 image(
-                    database.default_normal_map,
+                    tex.texture,
                     agl::Level(0),
                     0, 0, agl::Width(0), agl::Height(0),
                     GL_RGB, GL_FLOAT,
                     as_bytes(std::span(normal)));
             }
-        }
-        { // Default emissive texture.
-            default_emissive_tex = create(agl::TextureTarget::_2d);
-            storage(
-                default_emissive_tex,
-                GL_RGB8, agl::Width(1), agl::Height(1));
-            auto rgb = std::array{agl::vec3(0.f, 0.f, 0.f)};
-            image(
-                default_emissive_tex,
-                agl::Level(0),
-                0, 0, agl::Width(1), agl::Height(1),
-                GL_RGB, GL_FLOAT,
-                as_bytes(std::span(rgb)));
         }
 
         tinygltf::TinyGLTF loader;
@@ -189,19 +205,27 @@ struct GltfProgram : Program {
                 if(!primitive.material) {
                     primitive.material = eng::Material();
                 }
-
+    
                 auto& m = *primitive.material;
+
+
+                for(auto& t : m.textures | std::views::values | common::views::indirect) {
+                    if(!t.sampler) {
+                        t.sampler = default_sampler;
+                    }
+                }
 
                 m.program.program = database.default_material.program.program;
 
                 if(!m.textures.contains("baseColorTexture")) {
-                    m.textures["baseColorTexture"] = database.default_albedo_map;
+                    auto t = eng::Texture();
+                    m.textures["baseColorTexture"] = default_albedo_tex;
                 }
                 if(!m.textures.contains("emissiveTexture")) {
                     m.textures["emissiveTexture"] = default_emissive_tex;
                 }
                 if(!m.textures.contains("normalTexture")) {
-                    m.textures["normalTexture"] = database.default_normal_map;
+                    m.textures["normalTexture"] = default_normal_map_tex;
                 }
             }
         }
@@ -216,64 +240,69 @@ struct GltfProgram : Program {
         { // GBuffer.
             g_buffer.opengl = agl::create(agl::framebuffer_tag);
             { // Albedo texture.
-                albedo_texture = agl::create(agl::TextureTarget::_2d);
-                mag_filter(albedo_texture, GL_LINEAR);
-                min_filter(albedo_texture, GL_LINEAR);
+                auto& tex = *albedo_texture;
+                tex.sampler = default_sampler;
+                tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
-                    albedo_texture, GL_RGB32F,
+                    tex.texture, GL_R11F_G11F_B10F,
                     agl::Width(window.width()), agl::Height(window.height()));
                 texture(g_buffer.opengl,
                     agl::ColorAttachment(0),
-                    albedo_texture);
+                    tex.texture);
             }
             { // Depth texture.
-                depth_texture = agl::create(agl::TextureTarget::_2d);
+                auto& tex = *depth_texture;
+                tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
-                    depth_texture, GL_DEPTH_COMPONENT32F,
+                    tex.texture, GL_DEPTH_COMPONENT32F,
                     agl::Width(window.width()), agl::Height(window.height()));
                 texture(g_buffer.opengl,
                     agl::depth_tag,
-                    depth_texture);
+                    tex.texture);
             }
             { // Emissive texture.
-                emissive_texture = agl::create(agl::TextureTarget::_2d);
+                auto& tex = *emissive_texture;
+                tex.sampler = default_sampler;
+                tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
-                    emissive_texture, GL_R11F_G11F_B10F,
+                    tex.texture, GL_R11F_G11F_B10F,
                     agl::Width(window.width()), agl::Height(window.height()));
                 texture(g_buffer.opengl,
                     agl::ColorAttachment(1),
-                    emissive_texture);
+                    tex.texture);
             }
             { // Metallic roughness texture.
-                metallic_roughness_texture = agl::create(agl::TextureTarget::_2d);
+                auto& tex = *metallic_roughness_texture;
+                tex.sampler = default_sampler;
+                tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
-                    metallic_roughness_texture, GL_R11F_G11F_B10F,
+                    tex.texture, GL_R11F_G11F_B10F,
                     agl::Width(window.width()), agl::Height(window.height()));
                 texture(g_buffer.opengl,
                     agl::ColorAttachment(2),
-                    metallic_roughness_texture);
+                    tex.texture);
             }
             { // Normal texture.
-                normal_texture = agl::create(agl::TextureTarget::_2d);
-                mag_filter(normal_texture, GL_LINEAR);
-                min_filter(normal_texture, GL_LINEAR);
+                auto& tex = *normal_texture;
+                tex.sampler = default_sampler;
+                tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
-                    normal_texture, GL_RGB32F,
+                    tex.texture, GL_RGB32F,
                     agl::Width(window.width()), agl::Height(window.height()));
                 texture(g_buffer.opengl,
                     agl::ColorAttachment(3),
-                    normal_texture);
+                    tex.texture);
             }
             { // Position texture. 
-                position_texture = agl::create(agl::TextureTarget::_2d);
-                mag_filter(position_texture, GL_LINEAR);
-                min_filter(position_texture, GL_LINEAR);
+                auto& tex = *position_texture;
+                tex.sampler = default_sampler;
+                tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
-                    position_texture, GL_RGB32F,
+                    tex.texture, GL_RGB32F,
                     agl::Width(window.width()), agl::Height(window.height()));
                 texture(g_buffer.opengl,
                     agl::ColorAttachment(4),
-                    position_texture);
+                    tex.texture);
             }
             auto fbs = std::array<agl::FramebufferDrawBuffer, 5>{
                 agl::ColorAttachment(0),
@@ -296,7 +325,7 @@ struct GltfProgram : Program {
         }
 
         { // Cube shadow map.
-            cube_shadow_map_tex = gltf::cube_shadow_mapping_texture(cube_shadow_map_res);
+            cube_shadow_map_tex->texture = gltf::cube_shadow_mapping_texture(cube_shadow_map_res);
             cube_shadow_map_mat = gltf::cubic_shadow_mapping_material();
             cube_shadow_map_mat.on_bind = [=]() {
                 glViewport(0, 0, cube_shadow_map_res, cube_shadow_map_res);
@@ -331,7 +360,7 @@ struct GltfProgram : Program {
             ambient_light_mat.textures["position_texture"] = position_texture;
         }
         { // Directional light.
-            dir_light.shadow_map = gltf::shadow_mapping_texture(shadow_map_resolution);
+            dir_light.shadow_map->texture = gltf::shadow_mapping_texture(shadow_map_resolution);
             dir_light_mat = gltf::directional_lighting_material();
             dir_light_mat.textures["albedo_texture"] = albedo_texture;
             dir_light_mat.textures["normal_texture"] = normal_texture;
@@ -339,7 +368,7 @@ struct GltfProgram : Program {
             dir_light_mat.textures["shadow_map"] = dir_light.shadow_map;
         }
         { // Spot light.
-            spot_light.shadow_map = gltf::shadow_mapping_texture(shadow_map_resolution);
+            spot_light.shadow_map->texture = gltf::shadow_mapping_texture(shadow_map_resolution);
             spot_light_mat = gltf::spot_lighting_material();
             spot_light_mat.textures["albedo_texture"] = albedo_texture;
             spot_light_mat.textures["normal_texture"] = normal_texture;
@@ -356,16 +385,18 @@ struct GltfProgram : Program {
         }
 
         { // HDR.
-            hdr_tex = create(agl::TextureTarget::_2d);
-            mag_filter(position_texture, GL_NEAREST);
-            min_filter(position_texture, GL_NEAREST);
+            auto& tex = *hdr_tex;
+            tex.sampler = create(agl::sampler_tag);
+            mag_filter(*tex.sampler, GL_NEAREST);
+            min_filter(*tex.sampler, GL_NEAREST);
+            tex.texture = create(agl::TextureTarget::_2d);
             storage(
-                hdr_tex,
+                tex.texture,
                 GL_RGB16F,
                 agl::Width(window.width()), agl::Height(window.height()));
 
             hdr_fb = create(agl::framebuffer_tag);
-            texture(hdr_fb, agl::ColorAttachment(0), hdr_tex);
+            texture(hdr_fb, agl::ColorAttachment(0), tex.texture);
             draw_buffer(hdr_fb, agl::ColorAttachment(0));
 
             tone_mapping_mat = gltf::tone_mapping_material();
@@ -445,7 +476,7 @@ struct GltfProgram : Program {
             texture(
                 shadow_map_fb.opengl,
                 agl::depth_tag,
-                dir_light.shadow_map);
+                dir_light.shadow_map->texture);
 
             bind(shadow_map_fb);
             clear(shadow_map_fb);
@@ -467,7 +498,7 @@ struct GltfProgram : Program {
             texture(
                 shadow_map_fb.opengl,
                 agl::depth_tag,
-                dir_light.shadow_map);
+                dir_light.shadow_map->texture);
 
             bind(shadow_map_fb);
             clear(shadow_map_fb);
@@ -493,7 +524,7 @@ struct GltfProgram : Program {
                 texture(
                     shadow_map_fb.opengl,
                     agl::depth_tag,
-                    cube_shadow_map_tex,
+                    cube_shadow_map_tex->texture,
                     agl::Level(0),
                     face_i);
                 glClear(GL_DEPTH_BUFFER_BIT);

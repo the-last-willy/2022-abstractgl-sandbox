@@ -46,5 +46,5 @@ void main() {
     float shininess = 64.;
     float specular = pow(max(dot(view_direction, -normalize(reflect(light_direction_vs, normal))), 0.), shininess);
 
-    fragment_rgb = (shadow ? vec3(0.) : 1. * diffuse) + .5 * specular;
+    fragment_rgb = (shadow ? vec3(0.) : 1. * diffuse + .5 * specular);
 }

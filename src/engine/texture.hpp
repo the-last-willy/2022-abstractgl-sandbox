@@ -2,10 +2,12 @@
 
 #include <agl/all.hpp>
 
+#include <optional>
+
 namespace eng {
 
 struct Texture {
-    // Sampler ?
+    std::optional<agl::Sampler> sampler = std::nullopt;
     agl::Texture texture = {};
 };
 

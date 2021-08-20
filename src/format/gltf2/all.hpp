@@ -17,8 +17,9 @@ struct Content {
     std::map<int, eng::Material> materials = {};
     std::map<int, std::shared_ptr<eng::Mesh>> meshes = {};
     std::map<int, std::shared_ptr<eng::Node>> nodes = {};
+    std::map<int, agl::Sampler> samplers = {};
     std::map<int, std::shared_ptr<eng::Scene>> scenes = {};
-    std::map<int, eng::Texture> textures = {};
+    std::map<int, std::shared_ptr<eng::Texture>> textures = {};
 };
 
 inline
@@ -34,7 +35,7 @@ auto fill(tinygltf::Model& model) {
         }
     }
 
-    { // Converting images into gl textures.
+    { // Converting images.
         for(std::size_t i = 0; i < size(model.images); ++i) {
             auto& image = model.images[i];
             auto t = agl::create(agl::TextureTarget::_2d);
@@ -70,12 +71,33 @@ auto fill(tinygltf::Model& model) {
         }
     }
 
+    { // Converting samplers.
+        for(std::size_t i = 0; i < size(model.samplers); ++i) {
+            auto& sampler = model.samplers[i];
+            auto& eng_sampler = content.samplers[static_cast<int>(i)]
+                = create(agl::sampler_tag);
+
+            if(sampler.magFilter != -1) {
+                mag_filter(eng_sampler, sampler.magFilter);
+            }
+            if(sampler.minFilter != -1) {
+                min_filter(eng_sampler, sampler.minFilter);
+            }
+            parameter(eng_sampler, agl::TextureParameter::wrap_s, sampler.wrapS);
+            parameter(eng_sampler, agl::TextureParameter::wrap_t, sampler.wrapT);
+        }
+    }
+
     { // Converting textures.
         for(std::size_t i = 0; i < size(model.textures); ++i) {
             auto& texture = model.textures[i];
+            auto& eng_texture = *(content.textures[static_cast<int>(i)]
+                = std::make_shared<eng::Texture>());
 
-            content.textures[static_cast<int>(i)] = {
-                content.images.at(texture.source) };
+            if(texture.sampler != -1) {
+                eng_texture.sampler = content.samplers.at(texture.sampler);
+            }
+            eng_texture.texture = content.images.at(texture.source);
         }
     }
 
@@ -99,14 +121,14 @@ auto fill(tinygltf::Model& model) {
                 auto& et = material.emissiveTexture;  
                 if(et.index != -1) {
                     eng_material.textures["emissiveTexture"]
-                    = content.textures.at(et.index).texture;
+                    = content.textures.at(et.index);
                 }
             }
             { // 'normalTexture'.
                 auto& normalTexture = material.normalTexture;  
                 if(normalTexture.index != -1) {
                     eng_material.textures["normalTexture"]
-                    = content.textures.at(normalTexture.index).texture;
+                    = content.textures.at(normalTexture.index);
                 }
             }
             { // 'pbrMetallicRoughness'.
@@ -124,14 +146,14 @@ auto fill(tinygltf::Model& model) {
                     auto& baseColorTexture = pmr.baseColorTexture;
                     if(baseColorTexture.index != -1) {
                         eng_material.textures["baseColorTexture"]
-                        = content.textures.at(baseColorTexture.index).texture;
+                        = content.textures.at(baseColorTexture.index);
                     }
                 }
                 { // 'metallicRoughnessTexture'.
                     auto& mrt = pmr.metallicRoughnessTexture;
                     if(mrt.index != -1) {
                         eng_material.textures["metallicRoughnessTexture"]
-                        = content.textures.at(mrt.index).texture;
+                        = content.textures.at(mrt.index);
                     }
                 }
             }
@@ -202,8 +224,7 @@ auto fill(tinygltf::Model& model) {
     { // Converting meshes and primitives.
         for(std::size_t i = 0; i < size(model.meshes); ++i) {
             auto& mesh = model.meshes[i];
-            auto& eng_mesh
-            = *(content.meshes[static_cast<int>(i)]
+            auto& eng_mesh = *(content.meshes[static_cast<int>(i)]
                 = std::make_shared<eng::Mesh>());
 
             for(auto& primitive : mesh.primitives) {
@@ -220,8 +241,8 @@ auto fill(tinygltf::Model& model) {
                         auto& buffer = model.buffers[buffer_view.buffer];
                         auto short_data = std::vector<GLushort>(accessor.count);
                         auto offset = accessor.byteOffset + buffer_view.byteOffset;
-                        for(std::size_t i = 0; i < size(short_data); ++i) {
-                            short_data[i] = buffer.data[offset + i];
+                        for(std::size_t j = 0; j < size(short_data); ++j) {
+                            short_data[j] = buffer.data[offset + j];
                         }
                         auto eng_buffer = agl::create(agl::buffer_tag);
                         storage(eng_buffer, std::span(short_data));

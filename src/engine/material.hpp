@@ -1,6 +1,7 @@
 #pragma once
 
 #include "program.hpp"
+#include "texture.hpp"
 #include "uniform.hpp"
 
 #include <agl/all.hpp>
@@ -15,7 +16,7 @@ namespace eng {
 struct Material {
     eng::Program program = {};
 
-    std::map<std::string, agl::Texture> textures = {};
+    std::map<std::string, std::shared_ptr<eng::Texture>> textures = {};
 
     std::map<std::string, AnyUniform*> uniforms = {};
 
@@ -25,10 +26,14 @@ struct Material {
 inline
 void bind_textures(const Material& m) {
     auto unit = 0;
-    for(auto [name, texture] : m.textures) {
+    for(auto [name, texture_ptr] : m.textures) {
+        auto& texture = *texture_ptr;
         auto ul = uniform_location(m.program.program, name.c_str());
         if(ul) {
-            bind(agl::TextureUnit(unit), texture);
+            if(texture.sampler) {
+                bind(agl::TextureUnit(unit), *texture.sampler);
+            }
+            bind(agl::TextureUnit(unit), texture.texture);
             agl::uniform(m.program.program, *ul, unit);
             unit += 1;
         }
