@@ -1,6 +1,7 @@
 #pragma once
 
 #include "capability.hpp"
+#include "shader.hpp"
 
 #include <agl/all.hpp>
 
@@ -25,6 +26,21 @@ void load(
         auto s = create(type);
         source(s, src);
         compile(s);
+        agl::attach(p.program, s);
+        delete_(s);
+    }
+    link(p.program);
+}
+
+inline
+void load(
+    Program& p,
+    const ShaderCompiler& sc,
+    const std::map<agl::ShaderType, std::string> shader_filepaths)
+{
+    p.program = agl::create(agl::program_tag);
+    for(auto& [type, filepath] : shader_filepaths) {
+        auto s = sc(filepath, type);
         agl::attach(p.program, s);
         delete_(s);
     }

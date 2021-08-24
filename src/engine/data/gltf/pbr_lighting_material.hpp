@@ -5,18 +5,20 @@
 namespace gltf {
 
 inline
-auto pbr_lighting_material() {
+auto pbr_lighting_material(const eng::ShaderCompiler& sc) {
     auto m = eng::Material();
-    load(m.program, {
+    load(m.program, sc, {
         {
             agl::vertex_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/brdf/point_light.vs")
+            "gltf/deferred/brdf/point_light.vs"
         },
         {
             agl::fragment_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/brdf/point_light.fs")
+            "gltf/deferred/brdf/point_light.fs"
         }});
-    
+    if(!agl::link_status(m.program.program)) {
+        throw std::runtime_error("Failed to load material.");
+    }
     m.program.capabilities.emplace_back(
         agl::Capability::blend, []() {
             glBlendEquation(GL_FUNC_ADD);

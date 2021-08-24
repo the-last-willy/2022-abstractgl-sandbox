@@ -29,12 +29,16 @@ struct Primitive {
 inline
 void bind(const Primitive& p) {
     bind(p.vertex_array);
-    bind(*p.material);
+    if(p.material) {
+        bind(*p.material);
+    }
 }
 
 inline
 void unbind(const Primitive& p) {
-    unbind(*p.material);
+    if(p.material) {
+        unbind(*p.material);
+    }
 } 
 
 inline
@@ -86,6 +90,11 @@ void render(const Primitive& p) {
             p.primitive_count,
             p.draw_type,
             agl::Offset<GLintptr>(p.offset));
+    } else {
+        agl::draw_arrays(
+            p.draw_mode,
+            agl::Offset<GLint>(static_cast<GLint>(p.offset)),
+            p.primitive_count);
     }
 }
 
