@@ -19,6 +19,8 @@ void error_callback(
     const char* _type;
     const char* _severity;
 
+    auto throwing = true;
+
     switch (source) {
         case GL_DEBUG_SOURCE_API:
         _source = "API";
@@ -30,6 +32,7 @@ void error_callback(
 
         case GL_DEBUG_SOURCE_SHADER_COMPILER:
         _source = "SHADER COMPILER";
+        throwing = false;
         break;
 
         case GL_DEBUG_SOURCE_THIRD_PARTY:
@@ -108,5 +111,7 @@ void error_callback(
     printf("%d: %s of %s severity, raised from %s: %s\n",
             id, _type, _severity, _source, msg);
 
-    throw std::exception();
+    if(throwing) {
+        throw std::exception();
+    }
 }
