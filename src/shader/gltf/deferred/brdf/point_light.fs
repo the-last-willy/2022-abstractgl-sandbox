@@ -2,6 +2,8 @@
 
 const float pi = 3.14159265359;
 
+#include "brdf/distribution_ggx.glsl"
+
 uniform sampler2D albedo_texture;
 uniform sampler2D metallic_roughness_texture;
 uniform sampler2D normal_texture;
@@ -12,13 +14,6 @@ uniform vec3 light_position;
 in vec2 vertex_texcoords;
 
 out vec3 fragment_rgb;
-
-float distribution_ggx(vec3 n, vec3 h, float a) {
-    float alpha = a * a;
-    float h_dot_n = dot(h, n);
-    float D0 = h_dot_n * h_dot_n * (alpha - 1) + 1;
-    return alpha / (pi * D0 * D0);
-}
 
 float geometry_schlick_ggx_direct(vec3 n, vec3 v, float k) {
     float alpha = k * k;
