@@ -7,6 +7,7 @@
 
 // Local headers.
 
+#include <local/all.hpp>
 #include "engine/data/all.hpp"
 #include "engine/all.hpp"
 #include "format/gltf2/all.hpp"
@@ -44,13 +45,18 @@ struct PointLight {
 };
 
 struct GltfProgram : Program {
-    eng::Database database = {};
+    eng::ShaderCompiler shader_compiler = {};
+
+    std::shared_ptr<eng::Primitive> fullscreen_prim = std::make_shared<eng::Primitive>();
 
     // glTF file.
     format::gltf2::Content scene = {};
 
     // Default sampler.
     agl::Sampler default_sampler;
+
+    // Default material.
+    std::shared_ptr<eng::Material> default_material = std::make_shared<eng::Material>();
 
     // Default textures.
     std::shared_ptr<eng::Texture> default_albedo_tex = std::make_shared<eng::Texture>();
@@ -111,13 +117,21 @@ struct GltfProgram : Program {
     tlw::View view = {};
     
     void init() override {
+        { // Shader compiler.
+            shader_compiler.root = local::shader_folder;
+        }
+        { // Fullscreen primitive.
+            auto& p = *fullscreen_prim;
+            p.vertex_array = agl::vertex_array();
+            p.primitive_count = agl::Count<GLsizei>(6);
+        }
         { // Default sampler.
             default_sampler = create(agl::sampler_tag);
             mag_filter(default_sampler, GL_LINEAR);
             min_filter(default_sampler, GL_LINEAR);
         }
         { // Default textures.
-            database.default_material = gltf::g_buffer_material();
+            *default_material = gltf::g_buffer_material();
             { // Albedo.
                 auto& tex = *default_albedo_tex;
                 tex.sampler = default_sampler;
@@ -241,7 +255,7 @@ struct GltfProgram : Program {
                     }
                 }
 
-                m.program.program = database.default_material.program.program;
+                m.program.program = default_material->program.program;
 
                 if(!m.textures.contains("baseColorTexture")) {
                     auto t = eng::Texture();
@@ -336,7 +350,7 @@ struct GltfProgram : Program {
             { // Setting color attachments.
                 auto frag_data_locations = std::vector<agl::FramebufferDrawBuffer>();
                 for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
-                    auto fdl = frag_data_location(database.default_material.program.program, name.c_str());
+                    auto fdl = frag_data_location(default_material->program.program, name.c_str());
                     if(fdl) {
                         frag_data_locations.push_back(agl::ColorAttachment(*fdl));
                         texture(g_buffer.opengl,
@@ -420,11 +434,9 @@ struct GltfProgram : Program {
 
         { // PBR material.
             try {
-                pbr_lighting_mat = gltf::pbr_lighting_material();
-                std::cout << "INIT SUCCESS" << std::endl;
+                pbr_lighting_mat = gltf::pbr_lighting_material(shader_compiler);
                 fresh_pbr_lighting_mat = true;
             } catch(...) {
-                std::cout << "INIT FAILURE" << std::endl;
                 fresh_pbr_lighting_mat = false;
             }
             for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
@@ -455,7 +467,7 @@ struct GltfProgram : Program {
 
         { // Camera.
             // SCENE CAMERA DISABLED>
-            if(true || empty(scene.cameras)) {
+            if constexpr(true /* empty(scene.cameras) */) {
                 auto& c = *(active_camera = std::make_shared<eng::Camera>());
                 if(auto pp = std::get_if<eng::PerspectiveProjection>(&c.projection)) {
                     pp->aspect_ratio = 16.f / 9.f;
@@ -531,11 +543,9 @@ struct GltfProgram : Program {
         if(glfwGetKey(window.window, GLFW_KEY_R)) {
             
             try {
-                pbr_lighting_mat.program = gltf::pbr_lighting_material().program;
-                std::cout << "RELOAD SUCCESS" << std::endl;
+                pbr_lighting_mat.program = gltf::pbr_lighting_material(shader_compiler).program;
                 fresh_pbr_lighting_mat = true;
             } catch(...) {
-                std::cout << "RELOAD FAILURE" << std::endl;
                 fresh_pbr_lighting_mat = false;
             }
         }
@@ -661,21 +671,23 @@ struct GltfProgram : Program {
                 bind(skybox_mat);
                 auto tr = rotation(view);
                 uniform(skybox_mat.program, "transform", tr);
-                bind(database.empty_vertex_array);
+                bind(*fullscreen_prim);
                 draw_arrays(
                     agl::DrawMode::triangles,
                     agl::Offset<GLint>(0),
                     agl::Count<GLsizei>(6));
+                unbind(*fullscreen_prim);
                 unbind(skybox_mat);
             }
 
             if constexpr(false) { // Ambient lighting.
                 bind(ambient_light_mat);
-                bind(database.empty_vertex_array);
+                bind(*fullscreen_prim);
                 draw_arrays(
                     agl::DrawMode::triangles,
                     agl::Offset<GLint>(0),
                     agl::Count<GLsizei>(6));
+                unbind(*fullscreen_prim);
                 unbind(ambient_light_mat);
             }
 
@@ -688,11 +700,12 @@ struct GltfProgram : Program {
                 uniform(dir_light_mat.program, "light_space_transform", light_space_transform);
                 uniform(dir_light_mat.program, "view_position", view.position);
 
-                bind(database.empty_vertex_array);
+                bind(*fullscreen_prim);
                 draw_arrays(
                     agl::DrawMode::triangles,
                     agl::Offset<GLint>(0),
                     agl::Count<GLsizei>(6));
+                unbind(*fullscreen_prim);
 
                 unbind(dir_light_mat);
             }
@@ -706,11 +719,12 @@ struct GltfProgram : Program {
                 uniform(dir_light_mat.program, "light_space_transform", light_space_transform);
                 uniform(dir_light_mat.program, "view_position", view.position);
 
-                bind(database.empty_vertex_array);
+                bind(*fullscreen_prim);
                 draw_arrays(
                     agl::DrawMode::triangles,
                     agl::Offset<GLint>(0),
                     agl::Count<GLsizei>(6));
+                unbind(*fullscreen_prim);
                 
                 unbind(dir_light_mat);
             }
@@ -723,11 +737,12 @@ struct GltfProgram : Program {
                 uniform(point_light_mat.program, "light_transform", inv_v);
                 uniform(point_light_mat.program, "view_position", view.position);
 
-                bind(database.empty_vertex_array);
+                bind(*fullscreen_prim);
                 draw_arrays(
                     agl::DrawMode::triangles,
                     agl::Offset<GLint>(0),
                     agl::Count<GLsizei>(6));
+                unbind(*fullscreen_prim);
 
                 unbind(point_light_mat);
             }
@@ -739,11 +754,12 @@ struct GltfProgram : Program {
                     auto light_position = v * vec4(point_light.position, 1.f);
                     uniform(pbr_lighting_mat.program, "light_position", light_position.xyz());
 
-                    bind(database.empty_vertex_array);
+                    bind(*fullscreen_prim);
                     draw_arrays(
                         agl::DrawMode::triangles,
                         agl::Offset<GLint>(0),
                         agl::Count<GLsizei>(6));
+                    unbind(*fullscreen_prim);
 
                     unbind(pbr_lighting_mat);
                 // }
@@ -754,11 +770,12 @@ struct GltfProgram : Program {
             bind(agl::default_framebuffer);
             bind(tone_mapping_mat);
 
-            bind(database.empty_vertex_array);
+            bind(*fullscreen_prim);
             draw_arrays(
                 agl::DrawMode::triangles,
                 agl::Offset<GLint>(0),
                 agl::Count<GLsizei>(6));
+            unbind(*fullscreen_prim);
 
             unbind(tone_mapping_mat);
         }
