@@ -202,11 +202,11 @@ struct GltfProgram : Program {
 
         bool ret = loader.LoadASCIIFromFile(
             &model, &err, &warn, 
-            "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
+            // "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
             // "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf"
 
             // "D:/data/sample/gltf2/MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf"
-            // "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf"
+            "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf"
             // "D:/data/sample/gltf2/OrientationTest/glTF/OrientationTest.gltf"
             // "D:/data/sample/gltf2/boom_box_with_axes/BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf"
             // "D:/data/sample/gltf2/Buggy/glTF/Buggy.gltf"
@@ -441,7 +441,7 @@ struct GltfProgram : Program {
             }
             for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
                 pbr_lighting_mat.textures[name] = texture_ptr;
-            }
+             }
         }
 
         { // HDR.
@@ -544,6 +544,7 @@ struct GltfProgram : Program {
             
             try {
                 pbr_lighting_mat.program = gltf::pbr_lighting_material(shader_compiler).program;
+                std::cout << "SHADER SUCCESS" << std::endl;
                 fresh_pbr_lighting_mat = true;
             } catch(...) {
                 fresh_pbr_lighting_mat = false;
