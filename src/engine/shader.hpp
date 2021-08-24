@@ -49,8 +49,14 @@ struct ShaderCompiler {
         agl::source(shader, source);
         compile(shader);
 
+        auto fp = filepath;
+        for(auto& c : fp) {
+            if(c == '/') {
+                c = '_';
+            }
+        }
         auto log_file = std::ofstream(
-            local::log_folder + "shader.glsl",
+            local::log_folder + "log_" + fp,
             std::ios::out | std::ios::trunc);
         if(log_file.is_open()) {
             log_file << source << std::flush;
@@ -61,7 +67,7 @@ struct ShaderCompiler {
                 throw std::runtime_error("Failed to compile shader.");
             }
         } else {
-            throw std::runtime_error("Failed to create log file");
+            throw std::runtime_error("Failed to create: " + local::log_folder + "log_" + filepath);
         }
 
         return shader;
