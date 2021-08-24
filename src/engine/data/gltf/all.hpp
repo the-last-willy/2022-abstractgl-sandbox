@@ -5,6 +5,7 @@
 #include "cubic_shadow_mapping_material.hpp"
 #include "directional_lighting_material.hpp"
 #include "g_buffer_material.hpp"
+#include "pbr_lighting_material.hpp"
 #include "perspective_shadow_mapping_material.hpp"
 #include "point_light_material.hpp"
 #include "shadow_mapping_material.hpp"

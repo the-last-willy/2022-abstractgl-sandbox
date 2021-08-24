@@ -1,7 +1,12 @@
 #pragma once
 
+#include "material.hpp"
+#include "texture.hpp"
+
 #include <agl/all.hpp>
 
+#include <map>
+#include <memory>
 #include <functional>
 
 namespace eng {
@@ -9,9 +14,10 @@ namespace eng {
 struct Framebuffer {
     agl::Framebuffer opengl = agl::none;
 
-    static void no_clear(const agl::Framebuffer&) {}
+    std::map<std::string, std::shared_ptr<Texture>> color_attachments = {};
 
-    std::function<void(const agl::Framebuffer&)> on_clear = &no_clear;
+    std::function<void(const agl::Framebuffer&)> on_clear
+    = [](const agl::Framebuffer&) {};
 };
 
 inline

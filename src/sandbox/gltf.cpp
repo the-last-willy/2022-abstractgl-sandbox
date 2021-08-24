@@ -56,15 +56,11 @@ struct GltfProgram : Program {
     std::shared_ptr<eng::Texture> default_albedo_tex = std::make_shared<eng::Texture>();
     std::shared_ptr<eng::Texture> default_emissive_tex = std::make_shared<eng::Texture>();
     std::shared_ptr<eng::Texture> default_normal_map_tex = std::make_shared<eng::Texture>();
+    std::shared_ptr<eng::Texture> default_occlusion_tex = std::make_shared<eng::Texture>();
 
     // G buffer.
     eng::Framebuffer g_buffer = {};
-    std::shared_ptr<eng::Texture> albedo_texture = std::make_shared<eng::Texture>();
     std::shared_ptr<eng::Texture> depth_texture = std::make_shared<eng::Texture>();
-    std::shared_ptr<eng::Texture> emissive_texture = std::make_shared<eng::Texture>();
-    std::shared_ptr<eng::Texture> metallic_roughness_texture = std::make_shared<eng::Texture>();
-    std::shared_ptr<eng::Texture> normal_texture = std::make_shared<eng::Texture>();
-    std::shared_ptr<eng::Texture> position_texture = std::make_shared<eng::Texture>();
 
     // HDR.
     std::shared_ptr<eng::Texture> hdr_tex = std::make_shared<eng::Texture>();
@@ -102,6 +98,13 @@ struct GltfProgram : Program {
     // Point light.
     PointLight point_light = {};
     eng::Material point_light_mat = {};
+
+    // PBR.
+    bool fresh_pbr_lighting_mat = true;
+    eng::Material pbr_lighting_mat = {};
+
+    // Active camera.
+    std::shared_ptr<eng::Camera> active_camera = {};
 
     // Player camera.
     tlw::PerspectiveProjection projection = {};
@@ -156,9 +159,24 @@ struct GltfProgram : Program {
                 image(
                     tex.texture,
                     agl::Level(0),
-                    0, 0, agl::Width(0), agl::Height(0),
+                    0, 0, agl::Width(1), agl::Height(1),
                     GL_RGB, GL_FLOAT,
                     as_bytes(std::span(normal)));
+            }
+            { // Occlusion map.
+                auto& tex = *default_occlusion_tex;
+                tex.sampler = default_sampler;
+                tex.texture = create(agl::TextureTarget::_2d);
+                storage(
+                    tex.texture,
+                    GL_R32F, agl::Width(1), agl::Height(1));
+                auto occlusion = std::array{1.f};
+                image(
+                    tex.texture,
+                    agl::Level(0),
+                    0, 0, agl::Width(1), agl::Height(1),
+                    GL_RED, GL_FLOAT,
+                    as_bytes(std::span(occlusion)));
             }
         }
 
@@ -172,6 +190,7 @@ struct GltfProgram : Program {
             &model, &err, &warn, 
             "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
             // "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf"
+
             // "D:/data/sample/gltf2/MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf"
             // "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf"
             // "D:/data/sample/gltf2/OrientationTest/glTF/OrientationTest.gltf"
@@ -197,6 +216,13 @@ struct GltfProgram : Program {
 
         { // Precomputing model transforms.
 
+        }
+        { // Normalizing cameras.
+            for(auto& c : scene.cameras | std::views::values | common::views::indirect) {
+                if(auto pp = std::get_if<eng::PerspectiveProjection>(&c.projection)) {
+                    pp->aspect_ratio = 16.f / 9.f;
+                }
+            }
         }
 
         { // Normalizing materials.
@@ -227,6 +253,9 @@ struct GltfProgram : Program {
                 if(!m.textures.contains("normalTexture")) {
                     m.textures["normalTexture"] = default_normal_map_tex;
                 }
+                if(!m.textures.contains("occlusionTexture")) {
+                    m.textures["occlusionTexture"] = default_occlusion_tex;
+                }
             }
         }
 
@@ -240,15 +269,13 @@ struct GltfProgram : Program {
         { // GBuffer.
             g_buffer.opengl = agl::create(agl::framebuffer_tag);
             { // Albedo texture.
-                auto& tex = *albedo_texture;
+                auto& tex = *(g_buffer.color_attachments["albedo_texture"]
+                    = std::make_shared<eng::Texture>());
                 tex.sampler = default_sampler;
                 tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
                     tex.texture, GL_R11F_G11F_B10F,
                     agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer.opengl,
-                    agl::ColorAttachment(0),
-                    tex.texture);
             }
             { // Depth texture.
                 auto& tex = *depth_texture;
@@ -261,56 +288,64 @@ struct GltfProgram : Program {
                     tex.texture);
             }
             { // Emissive texture.
-                auto& tex = *emissive_texture;
+                auto& tex = *(g_buffer.color_attachments["emissive_texture"]
+                    = std::make_shared<eng::Texture>());
                 tex.sampler = default_sampler;
                 tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
                     tex.texture, GL_R11F_G11F_B10F,
                     agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer.opengl,
-                    agl::ColorAttachment(1),
-                    tex.texture);
             }
             { // Metallic roughness texture.
-                auto& tex = *metallic_roughness_texture;
+                auto& tex = *(g_buffer.color_attachments["metallic_roughness_texture"]
+                    = std::make_shared<eng::Texture>());
                 tex.sampler = default_sampler;
                 tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
                     tex.texture, GL_R11F_G11F_B10F,
                     agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer.opengl,
-                    agl::ColorAttachment(2),
-                    tex.texture);
             }
             { // Normal texture.
-                auto& tex = *normal_texture;
+                auto& tex = *(g_buffer.color_attachments["normal_texture"]
+                    = std::make_shared<eng::Texture>());
                 tex.sampler = default_sampler;
                 tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
                     tex.texture, GL_RGB32F,
                     agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer.opengl,
-                    agl::ColorAttachment(3),
-                    tex.texture);
+            }
+            { // Occlusion texture. 
+                auto& tex = *(g_buffer.color_attachments["occlusion_texture"]
+                    = std::make_shared<eng::Texture>());
+                tex.sampler = default_sampler;
+                tex.texture = agl::create(agl::TextureTarget::_2d);
+                storage(
+                    tex.texture, GL_RGB32F,
+                    agl::Width(window.width()), agl::Height(window.height()));
             }
             { // Position texture. 
-                auto& tex = *position_texture;
+                auto& tex = *(g_buffer.color_attachments["position_texture"]
+                    = std::make_shared<eng::Texture>());
                 tex.sampler = default_sampler;
                 tex.texture = agl::create(agl::TextureTarget::_2d);
                 storage(
                     tex.texture, GL_RGB32F,
                     agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer.opengl,
-                    agl::ColorAttachment(4),
-                    tex.texture);
             }
-            auto fbs = std::array<agl::FramebufferDrawBuffer, 5>{
-                agl::ColorAttachment(0),
-                agl::ColorAttachment(1),
-                agl::ColorAttachment(2),
-                agl::ColorAttachment(3),
-                agl::ColorAttachment(4),};
-            draw_buffers(g_buffer.opengl, std::span(fbs));
+
+            { // Setting color attachments.
+                auto frag_data_locations = std::vector<agl::FramebufferDrawBuffer>();
+                for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
+                    auto fdl = frag_data_location(database.default_material.program.program, name.c_str());
+                    if(fdl) {
+                        frag_data_locations.push_back(agl::ColorAttachment(*fdl));
+                        texture(g_buffer.opengl,
+                            agl::ColorAttachment(*fdl),
+                            texture_ptr->texture);
+                    }
+                }
+                draw_buffers(g_buffer.opengl, std::span(frag_data_locations));
+            }
         }
         
         { // Shadow map.
@@ -354,34 +389,47 @@ struct GltfProgram : Program {
 
         { // Ambient light.
             ambient_light_mat = gltf::ambient_lighting_material();
-            ambient_light_mat.textures["albedo_texture"] = albedo_texture;
-            ambient_light_mat.textures["emissive_texture"] = emissive_texture;
-            ambient_light_mat.textures["normal_texture"] = normal_texture;
-            ambient_light_mat.textures["position_texture"] = position_texture;
+            for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
+                ambient_light_mat.textures[name] = texture_ptr;
+            }
         }
         { // Directional light.
             dir_light.shadow_map->texture = gltf::shadow_mapping_texture(shadow_map_resolution);
             dir_light_mat = gltf::directional_lighting_material();
-            dir_light_mat.textures["albedo_texture"] = albedo_texture;
-            dir_light_mat.textures["normal_texture"] = normal_texture;
-            dir_light_mat.textures["position_texture"] = position_texture;
+            for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
+                dir_light_mat.textures[name] = texture_ptr;
+            }
             dir_light_mat.textures["shadow_map"] = dir_light.shadow_map;
         }
         { // Spot light.
             spot_light.shadow_map->texture = gltf::shadow_mapping_texture(shadow_map_resolution);
             spot_light_mat = gltf::spot_lighting_material();
-            spot_light_mat.textures["albedo_texture"] = albedo_texture;
-            spot_light_mat.textures["normal_texture"] = normal_texture;
-            spot_light_mat.textures["position_texture"] = position_texture;
+            for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
+                spot_light_mat.textures[name] = texture_ptr;
+            } 
             spot_light_mat.textures["shadow_map"] = spot_light.shadow_map;
         }
 
         { // Point light.
             point_light_mat = gltf::point_lighting_material();
-            point_light_mat.textures["albedo_texture"] = albedo_texture;
-            point_light_mat.textures["normal_texture"] = normal_texture;
-            point_light_mat.textures["position_texture"] = position_texture;
+            for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
+                point_light_mat.textures[name] = texture_ptr;
+            }
             point_light_mat.textures["shadow_map"] = cube_shadow_map_tex;
+        }
+
+        { // PBR material.
+            try {
+                pbr_lighting_mat = gltf::pbr_lighting_material();
+                std::cout << "INIT SUCCESS" << std::endl;
+                fresh_pbr_lighting_mat = true;
+            } catch(...) {
+                std::cout << "INIT FAILURE" << std::endl;
+                fresh_pbr_lighting_mat = false;
+            }
+            for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
+                pbr_lighting_mat.textures[name] = texture_ptr;
+            }
         }
 
         { // HDR.
@@ -406,9 +454,26 @@ struct GltfProgram : Program {
         glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         { // Camera.
-
+            // SCENE CAMERA DISABLED>
+            if(true || empty(scene.cameras)) {
+                auto& c = *(active_camera = std::make_shared<eng::Camera>());
+                if(auto pp = std::get_if<eng::PerspectiveProjection>(&c.projection)) {
+                    pp->aspect_ratio = 16.f / 9.f;
+                }
+            } else {
+                active_camera = scene.cameras.begin()->second;
+            }
         }
-        
+        { // Pre-computing camera transforms.
+            auto traverse_scene = [](eng::Node& n) {
+                traverse_cameras(n, [](eng::Camera& c, const agl::Mat4& transform) {
+                    c.transform = transform;
+                });
+            };
+            for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+                traverse_scene(n);
+            }
+        }
     }
 
     void update() override {
@@ -440,7 +505,7 @@ struct GltfProgram : Program {
 
         // Set directional light.
         if(glfwGetKey(window.window, GLFW_KEY_SPACE)) {
-            eng::OrthographicProjection op = {};
+            tlw::OrthographicProjection op = {};
             op.zoom = 1.f / 500.f;
             op.near_ = 0.f;
             op.far_ = 1000.f;
@@ -460,6 +525,19 @@ struct GltfProgram : Program {
         // Set spot light.
         if(glfwGetKey(window.window, GLFW_KEY_SPACE)) {
             point_light.position = view.position;
+        }
+
+        // Reload pbr material.
+        if(glfwGetKey(window.window, GLFW_KEY_R)) {
+            
+            try {
+                pbr_lighting_mat.program = gltf::pbr_lighting_material().program;
+                std::cout << "RELOAD SUCCESS" << std::endl;
+                fresh_pbr_lighting_mat = true;
+            } catch(...) {
+                std::cout << "RELOAD FAILURE" << std::endl;
+                fresh_pbr_lighting_mat = false;
+            }
         }
     }
 
@@ -549,7 +627,7 @@ struct GltfProgram : Program {
         auto inv_v = transform(view);
         auto v = inverse(inv_v);
 
-        auto vp = transform(projection) * v;
+        auto vp = transform(*active_camera) * v;
 
         { // G buffer.
             glViewport(0, 0, window.width(), window.height());
@@ -566,11 +644,6 @@ struct GltfProgram : Program {
                         uniform(m.program, "mv", mv);
                         uniform(m.program, "mvp", vp * transform);
                         auto normal_transform = transpose(inverse(mv));
-                        // TERRIBLENESS. RIGHT HANADED TO LEFT HANDED BY FLIPPING Z AXIS.
-                        // normal_transform[0][2] *= -1.f;
-                        // normal_transform[1][2] *= -1.f;
-                        // normal_transform[2][2] *= -1.f;
-                        // normal_transform[3][2] *= -1.f;
                         uniform(m.program, "normal_transform", normal_transform);
                         eng::render(primitive);
                         unbind(primitive);
@@ -596,7 +669,7 @@ struct GltfProgram : Program {
                 unbind(skybox_mat);
             }
 
-            if constexpr(true) { // Ambient lighting.
+            if constexpr(false) { // Ambient lighting.
                 bind(ambient_light_mat);
                 bind(database.empty_vertex_array);
                 draw_arrays(
@@ -642,7 +715,7 @@ struct GltfProgram : Program {
                 unbind(dir_light_mat);
             }
 
-            if constexpr(true) { // Point lights.
+            if constexpr(false) { // Point lights.
                 bind(point_light_mat);
 
                 auto light_position = v * vec4(point_light.position, 1.f);
@@ -657,6 +730,23 @@ struct GltfProgram : Program {
                     agl::Count<GLsizei>(6));
 
                 unbind(point_light_mat);
+            }
+
+            if constexpr(true) {
+                // if(fresh_pbr_lighting_mat) {
+                    bind(pbr_lighting_mat);
+
+                    auto light_position = v * vec4(point_light.position, 1.f);
+                    uniform(pbr_lighting_mat.program, "light_position", light_position.xyz());
+
+                    bind(database.empty_vertex_array);
+                    draw_arrays(
+                        agl::DrawMode::triangles,
+                        agl::Offset<GLint>(0),
+                        agl::Count<GLsizei>(6));
+
+                    unbind(pbr_lighting_mat);
+                // }
             }
         }
 

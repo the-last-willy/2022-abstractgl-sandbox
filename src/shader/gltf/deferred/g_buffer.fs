@@ -3,6 +3,7 @@
 uniform sampler2D baseColorTexture;
 uniform sampler2D emissiveTexture;
 uniform sampler2D metallicRoughnessTexture;
+uniform sampler2D occlusionTexture;
 uniform sampler2D normalTexture;
 
 uniform vec4 baseColorFactor = vec4(1., 1., 1., 1.);
@@ -12,11 +13,12 @@ in vec3 vertex_position;
 in vec4 vertex_tangent;
 in vec2 vertex_texcoord;
 
-layout(location = 0) out vec3 fragment_albedo;
-layout(location = 1) out vec3 fragment_emissive;
-layout(location = 2) out vec3 fragment_metallic_roughness;
-layout(location = 3) out vec3 fragment_normal;
-layout(location = 4) out vec3 fragment_position;
+layout(location = 0) out vec3 albedo_texture;
+layout(location = 1) out vec3 emissive_texture;
+layout(location = 2) out vec3 metallic_roughness_texture;
+layout(location = 3) out vec3 normal_texture;
+layout(location = 4) out float occlusion_texture;
+layout(location = 5) out vec3 position_texture;
 
 void main() {
     vec3 normal = normalize(vertex_normal);
@@ -34,13 +36,13 @@ void main() {
         if(albedo.a < .6) {
             discard;
         } else {
-            fragment_albedo = albedo.rgb;
+            albedo_texture = albedo.rgb;
         }
     }
     
-    fragment_emissive = texture(emissiveTexture, vertex_texcoord).rgb;
-    // fragment_metallic_roughness = 
-    texture(metallicRoughnessTexture, vertex_texcoord).rgb; // Channels
-    fragment_normal = normal;
-    fragment_position = vertex_position;
+    emissive_texture = texture(emissiveTexture, vertex_texcoord).rgb;
+    metallic_roughness_texture = texture(metallicRoughnessTexture, vertex_texcoord).rgb;
+    normal_texture = normal;
+    occlusion_texture = texture(occlusionTexture, vertex_texcoord).r;
+    position_texture = vertex_position;
 }

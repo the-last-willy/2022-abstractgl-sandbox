@@ -13,6 +13,7 @@ namespace format::gltf2 {
 struct Content {
     std::map<int, eng::Accessor> accessors = {};
     std::map<int, agl::Buffer> buffers = {};
+    std::map<int, std::shared_ptr<eng::Camera>> cameras = {};
     std::map<int, agl::Texture> images = {};
     std::map<int, eng::Material> materials = {};
     std::map<int, std::shared_ptr<eng::Mesh>> meshes = {};
@@ -117,6 +118,16 @@ auto fill(tinygltf::Model& model) {
                             glCullFace(GL_FRONT); }});
                 }
             }
+            { // 'emissiveFactor'.
+                auto& ef = material.emissiveFactor;  
+                if(size(ef) == 3) {
+                    eng_material.uniforms["emissiveFactor"]
+                    = new eng::Uniform<agl::Vec3>(agl::vec3(
+                        static_cast<float>(ef[0]),
+                        static_cast<float>(ef[1]),
+                        static_cast<float>(ef[2])));
+                }
+            }
             { // 'emissiveTexture'.
                 auto& et = material.emissiveTexture;  
                 if(et.index != -1) {
@@ -129,6 +140,16 @@ auto fill(tinygltf::Model& model) {
                 if(normalTexture.index != -1) {
                     eng_material.textures["normalTexture"]
                     = content.textures.at(normalTexture.index);
+                }
+            }
+            { // 'occlusionTexture'.
+                auto& t = material.occlusionTexture;  
+                if(t.index != -1) {
+                    eng_material.textures["occlusionTexture"]
+                    = content.textures.at(t.index);
+                    eng_material.uniforms["occlusionStrength"]
+                    = new eng::Uniform<GLfloat>(
+                        static_cast<float>(t.strength));
                 }
             }
             { // 'pbrMetallicRoughness'.
@@ -149,12 +170,22 @@ auto fill(tinygltf::Model& model) {
                         = content.textures.at(baseColorTexture.index);
                     }
                 }
+                { // 'metallicFactor'.
+                    eng_material.uniforms["metallicFactor"]
+                    = new eng::Uniform<GLfloat>(
+                        static_cast<GLfloat>(pmr.metallicFactor));
+                }
                 { // 'metallicRoughnessTexture'.
                     auto& mrt = pmr.metallicRoughnessTexture;
                     if(mrt.index != -1) {
                         eng_material.textures["metallicRoughnessTexture"]
                         = content.textures.at(mrt.index);
                     }
+                }
+                { // 'roughnessFactor'.
+                    eng_material.uniforms["metallicFactor"]
+                    = new eng::Uniform<GLfloat>(
+                        static_cast<GLfloat>(pmr.roughnessFactor));
                 }
             }
             content.materials[static_cast<int>(i)] = std::move(eng_material);
@@ -277,6 +308,29 @@ auto fill(tinygltf::Model& model) {
             }
         }
     }
+    { // Converting cameras.
+        for(std::size_t i = 0; i < size(model.cameras); ++i) {
+            auto& camera = model.cameras[i];
+
+            auto& eng_camera = *(content.cameras[static_cast<int>(i)]
+                = std::make_shared<eng::Camera>());
+
+            if(camera.type == "orthographic") {
+                throw std::runtime_error("Not implemented camera type.");
+            } else if(camera.type == "perspective") {
+                auto& persp = camera.perspective;
+                auto& pp = eng_camera.projection.emplace<eng::PerspectiveProjection>();
+                pp.aspect_ratio = static_cast<float>(persp.aspectRatio);
+                pp.y_fov = static_cast<float>(persp.yfov);
+                pp.z_near = static_cast<float>(persp.znear);
+                if(persp.zfar > 0.f) {
+                    pp.z_far = static_cast<float>(persp.zfar);
+                }
+            } else {
+                throw std::runtime_error("Unhandled camera types.");
+            }
+        }
+    }
     { // Converting nodes.
         for(std::size_t i = 0; i < size(model.nodes); ++i) {
             content.nodes[static_cast<int>(i)] = std::make_shared<eng::Node>();
@@ -304,23 +358,45 @@ auto fill(tinygltf::Model& model) {
                         static_cast<float>(node.translation[1]),
                         static_cast<float>(node.translation[2]));
                 }
+                if(size(node.rotation) == 4) {
+                    auto a = static_cast<float>(node.rotation[3]);
+                    auto b = static_cast<float>(node.rotation[0]);
+                    auto c = static_cast<float>(node.rotation[1]);
+                    auto d = static_cast<float>(node.rotation[2]);
+                    
+                    auto aa = a * a;
+                    auto bb = b * b;
+                    auto cc = c * c;
+                    auto dd = d * d;
+                    
+                    auto ab = 2.f * a * b;
+                    auto ac = 2.f * a * c;
+                    auto ad = 2.f * a * d;
+                    auto bc = 2.f * b * c;
+                    auto bd = 2.f * b * d;
+                    auto cd = 2.f * c * d;
+
+                    eng_node.transform = eng_node.transform * agl::mat4(
+                        aa + bb - cc - dd,           bc + ad,           bd - ac, 0.f,
+                                  bc - ad, aa - bb + cc - dd,           cd + ab, 0.f,
+                                  bd + ac,           cd - ab, aa - bb - cc + dd, 0.f,
+                                      0.f,                             0.f, 0.f, 1.f);
+                }
                 if(size(node.scale) == 3) {
                     eng_node.transform = eng_node.transform *  agl::scaling3(
                         static_cast<float>(node.scale[0]),
                         static_cast<float>(node.scale[1]),
                         static_cast<float>(node.scale[2]));
                 }
+            }
 
-                if(size(node.rotation) > 0) {
-                    std::cout << "Node rotation not implemented." << std::endl;
-                }
+            if(node.camera != -1) {
+                eng_node.camera = content.cameras.at(node.camera);
             }
 
             if(node.mesh != -1) {
                 eng_node.mesh = content.meshes.at(node.mesh);
             }
-
-            
         }
     }
     { // Converting scenes.
