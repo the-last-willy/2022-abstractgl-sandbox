@@ -2,6 +2,7 @@
 
 #include "primitive.hpp"
 
+#include <deque>
 #include <memory>
 
 namespace eng {
