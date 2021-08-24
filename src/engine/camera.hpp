@@ -65,6 +65,7 @@ auto transform(const Camera& c) {
     if(auto pp = std::get_if<PerspectiveProjection>(&c.projection)) {
         return transform(*pp) * c.transform;
     }
+    throw std::runtime_error("NOT IMPLEMENTED.");
 }
 
 }
