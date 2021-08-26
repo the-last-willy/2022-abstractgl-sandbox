@@ -39,10 +39,12 @@ struct Animation {
     std::vector<std::shared_ptr<AnimationChannel>> channels = {};
 };
 
+
+
 struct AnimationInterpolation {
-    std::size_t a = {};
-    std::size_t b = {};
-    float t = {};
+    std::size_t previous = {};
+    std::size_t next = {};
+    float t = 0.f;
 };
 
 struct AnimationPlayer {
@@ -50,16 +52,31 @@ struct AnimationPlayer {
 
     float time = 0.f; // In seconds.
 
-    int index(std::size_t channel_i) const {
+    AnimationInterpolation index(std::size_t channel_i) const {
         auto& timeline = animation->channels[channel_i]->sampler->input;
         auto ai = AnimationInterpolation();
-        for(std::size_t i = 0; i < timeline.count; ++i) {
-            auto frame_time = at<float>(timeline, i);
-            if(frame_time > time) {
-                return i - 1;
+        if(timeline.count) {
+            auto first_keyframe = at<float>(timeline, 0);
+            if(first_keyframe > time) {
+                ai.previous = 0;
+                ai.next = 0;
+                return ai;
             }
+            for(std::size_t i = 1; i < timeline.count; ++i) {
+                auto previous_keyframe = at<float>(timeline, i - 1);
+                auto next_keyframe = at<float>(timeline, i);
+                if(next_keyframe > time) {
+                    ai.previous = i - 1;
+                    ai.next = i;
+                    ai.t = (time - previous_keyframe) / (next_keyframe - previous_keyframe);
+                    return ai;
+                }
+            }
+            ai.previous = timeline.count - 1;
+            ai.next = timeline.count - 1;
+            return ai;
         }
-        return timeline.count - 1;
+        throw std::runtime_error("Animation channel without a single keyframe.");
     }   
 
     void update(float dt) {
