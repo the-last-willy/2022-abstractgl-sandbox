@@ -115,6 +115,10 @@ struct GltfProgram : Program {
     // Player camera.
     tlw::PerspectiveProjection projection = {};
     tlw::View view = {};
+
+    // Animation.
+    std::optional<eng::AnimationPlayer> animation_player = {};
+    std::map<const eng::Node*, agl::Mat4> node_animations = {};
     
     void init() override {
         { // Shader compiler.
@@ -202,11 +206,15 @@ struct GltfProgram : Program {
 
         bool ret = loader.LoadASCIIFromFile(
             &model, &err, &warn, 
-            // "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
+            "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
+            // "D:/data/sample/gltf2/virtual_city/VC/glTF/VC.gltf"
+            // "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf"
+            
             // "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf"
 
+            // "D:/data/sample/gltf2/BoxAnimated/glTF/BoxAnimated.gltf"
             // "D:/data/sample/gltf2/MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf"
-            "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf"
+            
             // "D:/data/sample/gltf2/OrientationTest/glTF/OrientationTest.gltf"
             // "D:/data/sample/gltf2/boom_box_with_axes/BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf"
             // "D:/data/sample/gltf2/Buggy/glTF/Buggy.gltf"
@@ -228,9 +236,6 @@ struct GltfProgram : Program {
 
         scene = format::gltf2::fill(model);
 
-        { // Precomputing model transforms.
-
-        }
         { // Normalizing cameras.
             for(auto& c : scene.cameras | std::views::values | common::views::indirect) {
                 if(auto pp = std::get_if<eng::PerspectiveProjection>(&c.projection)) {
@@ -243,7 +248,7 @@ struct GltfProgram : Program {
             for(auto& mesh : scene.meshes | std::views::values | common::views::indirect)
             for(auto& primitive : mesh.primitives | common::views::indirect) {
                 if(!primitive.material) {
-                    primitive.material = eng::Material();
+                    primitive.material = std::make_shared<eng::Material>();
                 }
     
                 auto& m = *primitive.material;
@@ -425,7 +430,7 @@ struct GltfProgram : Program {
         }
 
         { // Point light.
-            point_light_mat = gltf::point_lighting_material();
+            point_light_mat = gltf::point_lighting_material(shader_compiler);
             for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
                 point_light_mat.textures[name] = texture_ptr;
             }
@@ -486,9 +491,16 @@ struct GltfProgram : Program {
                 traverse_scene(n);
             }
         }
+
+        { // Animations.
+            if(!empty(scene.animations)) {
+                animation_player = eng::AnimationPlayer();
+                animation_player->animation = begin(scene.animations)->second;
+            }
+        }
     }
 
-    void update() override {
+    void update(float dt) override {
         {
             agl::Vec2 d = current_cursor_pos - previous_cursor_pos;
             view.yaw += d[0] / 500.f;
@@ -550,11 +562,44 @@ struct GltfProgram : Program {
                 fresh_pbr_lighting_mat = false;
             }
         }
+
+        if(animation_player) {
+            animation_player->update(dt);
+            for(std::size_t i = 0; i < size(animation_player->animation->channels); ++i) {
+                auto& channel = *animation_player->animation->channels[i];
+                auto idx = animation_player->index(i);
+                auto transform = agl::Mat4();
+                if       (idx == -1) {
+                    transform = mat4(agl::identity);
+                } else if(channel.target_path == eng::AnimationTargetPath::scale) {
+                    
+                } else if(channel.target_path == eng::AnimationTargetPath::rotation) {
+
+                } else if(channel.target_path == eng::AnimationTargetPath::translation) {
+                    transform = agl::translation(at<agl::Vec3>(channel.sampler->output, idx));
+                }
+                node_animations[channel.target_node.get()] = std::move(transform);
+            }
+        }
     }
 
     void render() override {
-        auto traverse_scene = [](eng::Node& n, auto f) {
-            traverse(n, [f](const eng::Mesh& m, const agl::Mat4& transform) {
+        auto traverse_nodes = [&](eng::Node& n, auto f, agl::Mat4 parent_transform = mat4(agl::identity)) {
+            auto transform = parent_transform * n.transform;
+            auto it = node_animations.find(&n);
+            if(it != end(node_animations)) {
+                transform = transform * it->second;
+            }
+            if(n.mesh) {
+                f(**n.mesh, transform);
+            }
+            for(auto& c : n.children) {
+                traverse(*c, f, transform);
+            }
+        };
+
+        auto traverse_scene = [&](eng::Node& n, auto f) {
+            traverse_nodes(n, [&, f](const eng::Mesh& m, const agl::Mat4& transform) {
                 for(auto& primitive : m.primitives | common::views::indirect) {
                     f(primitive, transform);
                 }
@@ -681,7 +726,7 @@ struct GltfProgram : Program {
                 unbind(skybox_mat);
             }
 
-            if constexpr(false) { // Ambient lighting.
+            if constexpr(true) { // Ambient lighting.
                 bind(ambient_light_mat);
                 bind(*fullscreen_prim);
                 draw_arrays(
@@ -730,7 +775,7 @@ struct GltfProgram : Program {
                 unbind(dir_light_mat);
             }
 
-            if constexpr(false) { // Point lights.
+            if constexpr(true) { // Point lights.
                 bind(point_light_mat);
 
                 auto light_position = v * vec4(point_light.position, 1.f);
@@ -748,7 +793,8 @@ struct GltfProgram : Program {
                 unbind(point_light_mat);
             }
 
-            if constexpr(true) {
+            // PBR.
+            if constexpr(false) {
                 // if(fresh_pbr_lighting_mat) {
                     bind(pbr_lighting_mat);
 

@@ -28,5 +28,9 @@ void main() {
     //     // hdr = pow(hdr, vec3(gamma));
     //     fragment_ldr = hdr;
     // }
-    fragment_ldr = hdr;
+
+    // vec3 v = hdr / (hdr + vec3(1.));
+    fragment_ldr = pow(hdr, vec3(1. / 2.2)); 
+
+    // fragment_ldr = hdr;
 }

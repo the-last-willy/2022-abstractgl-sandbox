@@ -1,10 +1,16 @@
 #pragma once
 
+#include "buffer.hpp"
+
 #include <agl/all.hpp>
+
+#include <memory>
 
 namespace eng {
 
 struct Accessor {
+    std::size_t count = {};
+
     agl::Offset<GLuint> byte_offset = agl::Offset<GLuint>(0);
     agl::Size<GLint> component_count = agl::Size<GLint>(0);
     int component_size = 0; // In bytes.
@@ -18,7 +24,16 @@ struct Accessor {
 
     // Buffer.
 
-    agl::Buffer buffer = agl::none;
+    std::shared_ptr<eng::Buffer> buffer = {};
 };
+
+template<typename T>
+const T& at(const Accessor& a, std::size_t i) {
+    auto& data = a.buffer->data;
+    auto offset = static_cast<std::size_t>(a.buffer_view_byte_offset)
+    + static_cast<std::size_t>(a.byte_offset)
+    + i * static_cast<std::size_t>(a.buffer_view_byte_stride);
+    return reinterpret_cast<const T&>(data[offset]);
+}
 
 }

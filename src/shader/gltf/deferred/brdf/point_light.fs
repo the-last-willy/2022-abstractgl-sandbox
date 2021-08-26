@@ -2,7 +2,7 @@
 
 const float pi = 3.14159265359;
 
-#include "brdf/ambient_lambert.glsl"
+#include "brdf/diffuse_lambertian.glsl"
 #include "brdf/fresnel_schlick.glsl"
 #include "brdf/geometric_schlick.glsl"
 #include "brdf/ndf_ggx.glsl"
@@ -12,6 +12,7 @@ uniform sampler2D metallic_roughness_texture;
 uniform sampler2D normal_texture;
 uniform sampler2D position_texture;
 
+uniform vec3 light_intensity = vec3(1., 0., 0.);
 uniform vec3 light_position;
 
 in vec2 vertex_texcoords;
@@ -57,35 +58,22 @@ void main() {
     vec3 view_direction = -normalize(position);
     vec3 halfway_direction = normalize(light_direction + view_direction);
 
+    float h_dot_n = max(dot(halfway_direction, normal), 0.);
+    float h_dot_v = max(dot(halfway_direction, view_direction), 0.);
+    float l_dot_n = max(dot(light_direction, normal), 0.);
+    float n_dot_v = max(dot(normal, view_direction), 0.);
+
     float alpha = roughness * roughness;
     vec3 F0 = mix(vec3(0.04), albedo, metalness);
 
-    float ndf = ndf_ggx(normal, halfway_direction, alpha);
-    float geometric = geometric_schlick(normal, light_direction, view_direction, alpha);
-    vec3 fresnel = fresnel_schlick(max(dot(view_direction, halfway_direction), 0.), F0);
+    float ndf = ndf_ggx(h_dot_n, alpha);
+    float geometric = geometric_schlick(l_dot_n, n_dot_v, alpha);
+    vec3 fresnel = fresnel_schlick(h_dot_v, F0);
 
-    vec3 specular_brdf = (ndf * geometric * fresnel)
-    / max(4. * max(dot(normal, light_direction), 0.) * max(dot(normal, view_direction), 0.), .001);
+    vec3 diffuse_brdf = diffuse_lambertian(albedo);
+    vec3 specular_brdf = (ndf * geometric * fresnel) / max(4. * l_dot_n * n_dot_v, .001);
 
     vec3 kd = (1. - fresnel) * (1. - metalness);
 
-    fragment_rgb = ambient_lambert(albedo) + (kd * albedo / pi + specular_brdf) * dot(normal, light_direction);
-
-    // if(gl_FragCoord.x < 640) {
-    //     fragment_rgb = vec3(geometry_schlick_ggx_direct(normal, view_direction, roughness));
-    // } else {
-    //     fragment_rgb = vec3(geometry_schlick_ggx_direct(normal, light_direction, roughness));
-    // }
-
-    
-
-    // if(gl_FragCoord.x < 640) {
-    //     float fresnel = pow(1. - max(dot(view_direction, normal), 0.), 5.);
-
-    //     fragment_rgb = vec3(fresnel);
-    // } else {
-    //     float fresnel = pow(1. - max(dot(halfway_direction, normal), 0.), 5.);
-
-    //     fragment_rgb = vec3(fresnel);
-    // }
+    fragment_rgb = (kd * diffuse_brdf + specular_brdf) * light_intensity * dot(normal, light_direction);
 }

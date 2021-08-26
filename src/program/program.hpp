@@ -12,7 +12,7 @@ struct Program {
 
     virtual void init() = 0;
 
-    virtual void update() = 0;
+    virtual void update(float dt) = 0;
 
     virtual void render() = 0;
 };
@@ -27,7 +27,7 @@ void run(Program& program) {
         time_since_update += clock.restart();
         if(time_since_update >= program.time_per_update) {
             time_since_update -= program.time_per_update;
-            program.update();
+            program.update(1.f / 60.f);
         }
 
         program.render();

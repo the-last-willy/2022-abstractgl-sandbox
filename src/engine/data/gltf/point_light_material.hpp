@@ -5,16 +5,16 @@
 namespace gltf {
 
 inline
-auto point_lighting_material() {
+auto point_lighting_material(const eng::ShaderCompiler& sc) {
     auto m = eng::Material();
-    load(m.program, {
+    load(m.program, sc, {
         {
             agl::vertex_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/lighting/point.vs")
+            "gltf/deferred/lighting/point.vs"
         },
         {
             agl::fragment_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/lighting/point.fs")
+            "gltf/deferred/lighting/point.fs"
         }});
     m.program.capabilities.emplace_back(
         agl::Capability::blend, []() {

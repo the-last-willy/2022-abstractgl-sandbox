@@ -20,7 +20,7 @@ void main() {
     float occlusion = texture(occlusion_texture, vertex_texcoords).r;
     vec3 position = texture(position_texture, vertex_texcoords).rgb;
 
-    float factor = .5;
+    float factor = .1;
     vec3 ambient = factor * albedo;
     fragment_rgb = emissive + mix(ambient, occlusion * ambient, occlusionStrength);
 }

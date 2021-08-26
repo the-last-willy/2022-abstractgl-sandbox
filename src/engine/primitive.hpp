@@ -3,6 +3,7 @@
 #include "accessor.hpp"
 #include "material.hpp"
 
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -14,7 +15,7 @@ struct Primitive {
 
     std::map<std::string, eng::Accessor> attributes = {};
 
-    std::optional<Material> material = std::nullopt;
+    std::shared_ptr<Material> material = {};
 
     // Indices.
 
@@ -60,7 +61,7 @@ void bind(Primitive& p, const Material& m) {
                 agl::Offset<GLuint>(0));
             vertex_buffer(
                 p.vertex_array, bi,
-                accessor.buffer,
+                accessor.buffer->opengl,
                 agl::Offset<GLintptr>(accessor.buffer_view_byte_offset.value + accessor.byte_offset.value),
                 accessor.buffer_view_byte_stride);
             enable(p.vertex_array, ai);
