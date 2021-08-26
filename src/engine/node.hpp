@@ -2,6 +2,7 @@
 
 #include "camera.hpp"
 #include "mesh.hpp"
+#include "transform.hpp"
 
 #include <agl/all.hpp>
 
@@ -14,7 +15,7 @@ namespace eng {
 struct Node {
     std::vector<std::shared_ptr<Node>> children = {};
 
-    agl::Mat4 transform = agl::mat4(agl::identity);
+    Transform transform = {};
     
     std::optional<std::shared_ptr<Camera>> camera = std::nullopt;
     std::optional<std::shared_ptr<Mesh>> mesh = std::nullopt;
@@ -22,7 +23,7 @@ struct Node {
 
 template<typename F>
 void traverse(Node& n, F f, agl::Mat4 parent_transform = mat4(agl::identity)) {
-    auto transform = parent_transform * n.transform;
+    auto transform = parent_transform * mat4(n.transform);
     if(n.mesh) {
         f(**n.mesh, transform);
     }
@@ -33,7 +34,7 @@ void traverse(Node& n, F f, agl::Mat4 parent_transform = mat4(agl::identity)) {
 
 template<typename F>
 void traverse_cameras(Node& n, F f, agl::Mat4 parent_transform = mat4(agl::identity)) {
-    auto transform = parent_transform * n.transform;
+    auto transform = parent_transform * mat4(n.transform);
     if(n.camera) {
         f(**n.camera, transform);
     }
