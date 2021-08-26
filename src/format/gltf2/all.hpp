@@ -364,28 +364,36 @@ void convert_nodes(Content& content, tinygltf::Model& model) {
                     static_cast<float>(node.translation[2]));
             }
             if(size(node.rotation) == 4) {
-                auto a = static_cast<float>(node.rotation[3]);
-                auto b = static_cast<float>(node.rotation[0]);
-                auto c = static_cast<float>(node.rotation[1]);
-                auto d = static_cast<float>(node.rotation[2]);
+                // auto a = static_cast<float>(node.rotation[3]);
+                // auto b = static_cast<float>(node.rotation[0]);
+                // auto c = static_cast<float>(node.rotation[1]);
+                // auto d = static_cast<float>(node.rotation[2]);
                 
-                auto aa = a * a;
-                auto bb = b * b;
-                auto cc = c * c;
-                auto dd = d * d;
+                // auto aa = a * a;
+                // auto bb = b * b;
+                // auto cc = c * c;
+                // auto dd = d * d;
                 
-                auto ab = 2.f * a * b;
-                auto ac = 2.f * a * c;
-                auto ad = 2.f * a * d;
-                auto bc = 2.f * b * c;
-                auto bd = 2.f * b * d;
-                auto cd = 2.f * c * d;
+                // auto ab = 2.f * a * b;
+                // auto ac = 2.f * a * c;
+                // auto ad = 2.f * a * d;
+                // auto bc = 2.f * b * c;
+                // auto bd = 2.f * b * d;
+                // auto cd = 2.f * c * d;
 
-                eng_node.transform = eng_node.transform * agl::mat4(
-                    aa + bb - cc - dd,           bc + ad,           bd - ac, 0.f,
-                                bc - ad, aa - bb + cc - dd,           cd + ab, 0.f,
-                                bd + ac,           cd - ab, aa - bb - cc + dd, 0.f,
-                                    0.f,                             0.f, 0.f, 1.f);
+                // eng_node.transform = eng_node.transform * agl::mat4(
+                //     aa + bb - cc - dd,           bc + ad,           bd - ac, 0.f,
+                //                 bc - ad, aa - bb + cc - dd,           cd + ab, 0.f,
+                //                 bd + ac,           cd - ab, aa - bb - cc + dd, 0.f,
+                //                     0.f,                             0.f, 0.f, 1.f);
+                
+                eng_node.transform = eng_node.transform
+                * agl::mat4(agl::Quaternion(
+                    static_cast<float>(node.rotation[3]),
+                    agl::vec3(
+                        static_cast<float>(node.rotation[0]),
+                        static_cast<float>(node.rotation[1]),
+                        static_cast<float>(node.rotation[2]))));
             }
             if(size(node.scale) == 3) {
                 eng_node.transform = eng_node.transform *  agl::scaling3(

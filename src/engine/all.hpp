@@ -12,3 +12,4 @@
 #include "node.hpp"
 #include "scene.hpp"
 #include "texture.hpp"
+#include "transform.hpp"

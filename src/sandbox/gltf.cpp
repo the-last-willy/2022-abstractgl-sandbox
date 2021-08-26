@@ -117,7 +117,7 @@ struct GltfProgram : Program {
     tlw::View view = {};
 
     // Animation.
-    std::optional<eng::AnimationPlayer> animation_player = {};
+    std::vector<eng::AnimationPlayer> animation_players = {};
     std::map<const eng::Node*, agl::Mat4> node_animations = {};
     
     void init() override {
@@ -206,13 +206,14 @@ struct GltfProgram : Program {
 
         bool ret = loader.LoadASCIIFromFile(
             &model, &err, &warn, 
-            "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
+            // "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
             // "D:/data/sample/gltf2/virtual_city/VC/glTF/VC.gltf"
             // "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf"
             
             // "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf"
 
-            // "D:/data/sample/gltf2/BoxAnimated/glTF/BoxAnimated.gltf"
+            // "D:/data/sample/gltf2/AnimatedTriangle/glTF/AnimatedTriangle.gltf"
+            "D:/data/sample/gltf2/BoxAnimated/glTF/BoxAnimated.gltf"
             // "D:/data/sample/gltf2/MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf"
             
             // "D:/data/sample/gltf2/OrientationTest/glTF/OrientationTest.gltf"
@@ -493,9 +494,9 @@ struct GltfProgram : Program {
         }
 
         { // Animations.
-            if(!empty(scene.animations)) {
-                animation_player = eng::AnimationPlayer();
-                animation_player->animation = begin(scene.animations)->second;
+            for(auto& a : scene.animations | std::views::values) {
+                auto& ap = animation_players.emplace_back();
+                ap.animation = a;
             }
         }
     }
@@ -563,29 +564,44 @@ struct GltfProgram : Program {
             }
         }
 
-        if(animation_player) {
-            animation_player->update(dt);
-            for(std::size_t i = 0; i < size(animation_player->animation->channels); ++i) {
-                auto& channel = *animation_player->animation->channels[i];
-                auto idx = animation_player->index(i);
-                auto transform = agl::Mat4();
-                if       (idx == -1) {
-                    transform = mat4(agl::identity);
-                } else if(channel.target_path == eng::AnimationTargetPath::scale) {
-                    
+        node_animations.clear();
+        for(auto& animation_player : animation_players) {
+            animation_player.update(dt);
+            for(std::size_t i = 0; i < size(animation_player.animation->channels); ++i) {
+                auto& channel = *animation_player.animation->channels[i];
+                auto interp_info = animation_player.index(i);
+                auto& transform = common::find_or_insert(
+                    node_animations,
+                    channel.target_node.get(),
+                    agl::mat4(agl::identity));
+                if(channel.target_path == eng::AnimationTargetPath::scale) {
+                    transform = agl::mat4(agl::identity);
                 } else if(channel.target_path == eng::AnimationTargetPath::rotation) {
-
+                    auto prev_data = at<agl::Vec4>(
+                        channel.sampler->output, interp_info.previous);
+                    auto prev_q = agl::Quaternion<float>(
+                        prev_data[3], agl::vec3(prev_data[0], prev_data[1], prev_data[2]));
+                    auto next_data = at<agl::Vec4>(
+                        channel.sampler->output, interp_info.next);
+                    auto next_q = agl::Quaternion<float>(
+                        next_data[3], agl::vec3(next_data[0], next_data[1], next_data[2]));
+                    auto s = agl::slerp(prev_q, next_q, interp_info.t);
+                    transform = transform * agl::mat4(
+                        agl::slerp(prev_q, next_q, interp_info.t));
                 } else if(channel.target_path == eng::AnimationTargetPath::translation) {
-                    transform = agl::translation(at<agl::Vec3>(channel.sampler->output, idx));
+                    auto prev = agl::translation(at<agl::Vec3>(
+                        channel.sampler->output, interp_info.previous));
+                    auto next = agl::translation(at<agl::Vec3>(
+                        channel.sampler->output, interp_info.next));
+                    transform = agl::mix(prev, next, interp_info.t) * transform;
                 }
-                node_animations[channel.target_node.get()] = std::move(transform);
             }
         }
     }
 
     void render() override {
         auto traverse_nodes = [&](eng::Node& n, auto f, agl::Mat4 parent_transform = mat4(agl::identity)) {
-            auto transform = parent_transform * n.transform;
+            auto transform = parent_transform * mat4(n.transform);
             auto it = node_animations.find(&n);
             if(it != end(node_animations)) {
                 transform = transform * it->second;
