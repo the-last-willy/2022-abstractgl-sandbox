@@ -5,6 +5,10 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define TINYGLTF_IMPLEMENTATION
 
+// Disabled warnings.
+
+#pragma warning(disable : 4005 4996)
+
 // Local headers.
 
 #include <local/all.hpp>
@@ -44,7 +48,30 @@ struct PointLight {
     agl::Vec3 position = {};
 };
 
+struct GltfProgram;
+
+inline
+void load_model(GltfProgram& program, const std::string& filepath);
+
 struct GltfProgram : Program {
+    std::vector<std::string> files = {
+        "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf",
+        "D:/data/sample/gltf2/virtual_city/VC/glTF/VC.gltf",
+        "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
+        "D:/data/sample/gltf2/CesiumMilkTruck/glTF/CesiumMilkTruck.gltf",
+        
+        "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf",
+
+        "D:/data/sample/gltf2/AnimatedTriangle/glTF/AnimatedTriangle.gltf",
+        "D:/data/sample/gltf2/BoxAnimated/glTF/BoxAnimated.gltf",
+        "D:/data/sample/gltf2/MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf",
+        
+        "D:/data/sample/gltf2/OrientationTest/glTF/OrientationTest.gltf",
+        "D:/data/sample/gltf2/boom_box_with_axes/BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf",
+        "D:/data/sample/gltf2/Buggy/glTF/Buggy.gltf",
+        "D:/data/sample/gltf2/ReciprocatingSaw/glTF/ReciprocatingSaw.gltf",
+    };
+
     eng::ShaderCompiler shader_compiler = {};
 
     std::shared_ptr<eng::Primitive> fullscreen_prim = std::make_shared<eng::Primitive>();
@@ -137,236 +164,48 @@ struct GltfProgram : Program {
         { // Default textures.
             *default_material = gltf::g_buffer_material();
             { // Albedo.
-                auto& tex = *default_albedo_tex;
-                tex.sampler = default_sampler;
-                tex.texture = create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture,
-                    GL_RGB8, agl::Width(1), agl::Height(1));
-                auto rgb = std::array{agl::vec3(1.f, 1.f, 1.f)};
-                image(
-                    tex.texture,
-                    agl::Level(0),
-                    0, 0, agl::Width(1), agl::Height(1),
-                    GL_RGB, GL_FLOAT,
-                    as_bytes(std::span(rgb)));
+                auto& t = *default_albedo_tex = eng::default_albedo_texture(agl::vec3(1.f));
+                t.sampler = default_sampler;
             }
             { // Emissive map.
-                auto& tex = *default_emissive_tex;
-                tex.sampler = default_sampler;
-                tex.texture = create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture,
-                    GL_RGB8, agl::Width(1), agl::Height(1));
-                auto rgb = std::array{agl::vec3(0.f, 0.f, 0.f)};
-                image(
-                    tex.texture,
-                    agl::Level(0),
-                    0, 0, agl::Width(1), agl::Height(1),
-                    GL_RGB, GL_FLOAT,
-                    as_bytes(std::span(rgb)));
+                auto& t = *default_emissive_tex = eng::default_emissive_texture(agl::vec3(0.f));
+                t.sampler = default_sampler;
             }
             { // Normal map.
-                auto& tex = *default_normal_map_tex;
-                tex.sampler = default_sampler;
-                tex.texture = create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture,
-                    GL_RGB32F, agl::Width(1), agl::Height(1));
-                auto normal = std::array{agl::vec3(0.f, 0.f, 1.f)};
-                image(
-                    tex.texture,
-                    agl::Level(0),
-                    0, 0, agl::Width(1), agl::Height(1),
-                    GL_RGB, GL_FLOAT,
-                    as_bytes(std::span(normal)));
+                auto& t = *default_normal_map_tex = eng::default_normal_texture(agl::vec3(0.f, 0.f, 1.f));
+                t.sampler = default_sampler;
             }
             { // Occlusion map.
-                auto& tex = *default_occlusion_tex;
-                tex.sampler = default_sampler;
-                tex.texture = create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture,
-                    GL_R32F, agl::Width(1), agl::Height(1));
-                auto occlusion = std::array{1.f};
-                image(
-                    tex.texture,
-                    agl::Level(0),
-                    0, 0, agl::Width(1), agl::Height(1),
-                    GL_RED, GL_FLOAT,
-                    as_bytes(std::span(occlusion)));
+                auto& t = *default_occlusion_tex = eng::default_occlusion_texture(1.f);
+                t.sampler = default_sampler;
             }
         }
 
-        tinygltf::TinyGLTF loader;
-        tinygltf::Model model;
+        load_model(*this, "D:/data/sample/gltf2/BoxAnimated/glTF/BoxAnimated.gltf");
 
-        std::string err;
-        std::string warn;
-
-        bool ret = loader.LoadASCIIFromFile(
-            &model, &err, &warn, 
-            // "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
-            // "D:/data/sample/gltf2/virtual_city/VC/glTF/VC.gltf"
-            // "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf"
-            // "D:/data/sample/gltf2/CesiumMilkTruck/glTF/CesiumMilkTruck.gltf"
-            
-            // "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf"
-
-            // "D:/data/sample/gltf2/AnimatedTriangle/glTF/AnimatedTriangle.gltf"
-            "D:/data/sample/gltf2/BoxAnimated/glTF/BoxAnimated.gltf"
-            // "D:/data/sample/gltf2/MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf"
-            
-            // "D:/data/sample/gltf2/OrientationTest/glTF/OrientationTest.gltf"
-            // "D:/data/sample/gltf2/boom_box_with_axes/BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf"
-            // "D:/data/sample/gltf2/Buggy/glTF/Buggy.gltf"
-            // "D:/data/sample/gltf2/ReciprocatingSaw/glTF/ReciprocatingSaw.gltf"
-            );
-
-        if (!warn.empty()) {
-            std::cerr << "Warning: " << warn << std::endl;
+        g_buffer = eng::gbuffer(window.width(), window.height());
+        { // Depth texture.
+            auto& tex = *depth_texture;
+            tex.texture = agl::create(agl::TextureTarget::_2d);
+            storage(
+                tex.texture, GL_DEPTH_COMPONENT32F,
+                agl::Width(window.width()), agl::Height(window.height()));
+            texture(g_buffer.opengl,
+                agl::depth_tag,
+                tex.texture);
         }
-
-        if (!err.empty()) {
-            std::cerr << "Error: " << err << std::endl;
-        }
-
-        if (!ret) {
-            std::cerr << "Failed to open GLTF file." << std::endl;
-            std::exit(EXIT_FAILURE);
-        }
-
-        scene = format::gltf2::fill(model);
-
-        { // Normalizing cameras.
-            for(auto& c : scene.cameras | std::views::values | common::views::indirect) {
-                if(auto pp = std::get_if<eng::PerspectiveProjection>(&c.projection)) {
-                    pp->aspect_ratio = 16.f / 9.f;
+        { // Setting color attachments.
+            auto frag_data_locations = std::vector<agl::FramebufferDrawBuffer>();
+            for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
+                auto fdl = frag_data_location(default_material->program.program, name.c_str());
+                if(fdl) {
+                    frag_data_locations.push_back(agl::ColorAttachment(*fdl));
+                    texture(g_buffer.opengl,
+                        agl::ColorAttachment(*fdl),
+                        texture_ptr->texture);
                 }
             }
-        }
-
-        { // Normalizing materials.
-            for(auto& mesh : scene.meshes | std::views::values | common::views::indirect)
-            for(auto& primitive : mesh.primitives | common::views::indirect) {
-                if(!primitive.material) {
-                    primitive.material = std::make_shared<eng::Material>();
-                }
-    
-                auto& m = *primitive.material;
-
-
-                for(auto& t : m.textures | std::views::values | common::views::indirect) {
-                    if(!t.sampler) {
-                        t.sampler = default_sampler;
-                    }
-                }
-
-                m.program.program = default_material->program.program;
-
-                if(!m.textures.contains("baseColorTexture")) {
-                    auto t = eng::Texture();
-                    m.textures["baseColorTexture"] = default_albedo_tex;
-                }
-                if(!m.textures.contains("emissiveTexture")) {
-                    m.textures["emissiveTexture"] = default_emissive_tex;
-                }
-                if(!m.textures.contains("normalTexture")) {
-                    m.textures["normalTexture"] = default_normal_map_tex;
-                }
-                if(!m.textures.contains("occlusionTexture")) {
-                    m.textures["occlusionTexture"] = default_occlusion_tex;
-                }
-            }
-        }
-
-        { // Vertex attribute plumbing.
-            for(auto& mesh : scene.meshes | std::views::values | common::views::indirect)
-            for(auto& primitive : mesh.primitives | common::views::indirect) {
-                bind(primitive, *primitive.material);
-            }
-        }
-
-        { // GBuffer.
-            g_buffer.opengl = agl::create(agl::framebuffer_tag);
-            { // Albedo texture.
-                auto& tex = *(g_buffer.color_attachments["albedo_texture"]
-                    = std::make_shared<eng::Texture>());
-                tex.sampler = default_sampler;
-                tex.texture = agl::create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture, GL_R11F_G11F_B10F,
-                    agl::Width(window.width()), agl::Height(window.height()));
-            }
-            { // Depth texture.
-                auto& tex = *depth_texture;
-                tex.texture = agl::create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture, GL_DEPTH_COMPONENT32F,
-                    agl::Width(window.width()), agl::Height(window.height()));
-                texture(g_buffer.opengl,
-                    agl::depth_tag,
-                    tex.texture);
-            }
-            { // Emissive texture.
-                auto& tex = *(g_buffer.color_attachments["emissive_texture"]
-                    = std::make_shared<eng::Texture>());
-                tex.sampler = default_sampler;
-                tex.texture = agl::create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture, GL_R11F_G11F_B10F,
-                    agl::Width(window.width()), agl::Height(window.height()));
-            }
-            { // Metallic roughness texture.
-                auto& tex = *(g_buffer.color_attachments["metallic_roughness_texture"]
-                    = std::make_shared<eng::Texture>());
-                tex.sampler = default_sampler;
-                tex.texture = agl::create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture, GL_R11F_G11F_B10F,
-                    agl::Width(window.width()), agl::Height(window.height()));
-            }
-            { // Normal texture.
-                auto& tex = *(g_buffer.color_attachments["normal_texture"]
-                    = std::make_shared<eng::Texture>());
-                tex.sampler = default_sampler;
-                tex.texture = agl::create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture, GL_RGB32F,
-                    agl::Width(window.width()), agl::Height(window.height()));
-            }
-            { // Occlusion texture. 
-                auto& tex = *(g_buffer.color_attachments["occlusion_texture"]
-                    = std::make_shared<eng::Texture>());
-                tex.sampler = default_sampler;
-                tex.texture = agl::create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture, GL_RGB32F,
-                    agl::Width(window.width()), agl::Height(window.height()));
-            }
-            { // Position texture. 
-                auto& tex = *(g_buffer.color_attachments["position_texture"]
-                    = std::make_shared<eng::Texture>());
-                tex.sampler = default_sampler;
-                tex.texture = agl::create(agl::TextureTarget::_2d);
-                storage(
-                    tex.texture, GL_RGB32F,
-                    agl::Width(window.width()), agl::Height(window.height()));
-            }
-
-            { // Setting color attachments.
-                auto frag_data_locations = std::vector<agl::FramebufferDrawBuffer>();
-                for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
-                    auto fdl = frag_data_location(default_material->program.program, name.c_str());
-                    if(fdl) {
-                        frag_data_locations.push_back(agl::ColorAttachment(*fdl));
-                        texture(g_buffer.opengl,
-                            agl::ColorAttachment(*fdl),
-                            texture_ptr->texture);
-                    }
-                }
-                draw_buffers(g_buffer.opengl, std::span(frag_data_locations));
-            }
+            draw_buffers(g_buffer.opengl, std::span(frag_data_locations));
         }
         
         { // Shadow map.
@@ -470,7 +309,7 @@ struct GltfProgram : Program {
             tone_mapping_mat.textures["hdr_map"] = hdr_tex;
         }
 
-        glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        // glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         { // Camera.
             // SCENE CAMERA DISABLED>
@@ -494,20 +333,19 @@ struct GltfProgram : Program {
             }
         }
 
-        { // Animations.
-            for(auto& a : scene.animations | std::views::values) {
-                auto& ap = animation_players.emplace_back();
-                ap.animation = a;
-            }
-        }
+        
     }
 
     void update(float dt) override {
-        {
+        if(glfwGetMouseButton(window.window, GLFW_MOUSE_BUTTON_1)) {
+            glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             agl::Vec2 d = current_cursor_pos - previous_cursor_pos;
             view.yaw += d[0] / 500.f;
             view.pitch += d[1] / 500.f;
 
+            previous_cursor_pos = current_cursor_pos;
+        } else {
+            glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             previous_cursor_pos = current_cursor_pos;
         }
         {
@@ -847,8 +685,111 @@ struct GltfProgram : Program {
 
             unbind(tone_mapping_mat);
         }
+
+        if(ImGui::BeginMainMenuBar()) {
+            if(ImGui::BeginMenu("File")) {
+                if(ImGui::BeginMenu("Open")) {
+                    for(auto& f : files) {
+                        if(ImGui::MenuItem(f.c_str())) {
+                            load_model(*this, f);
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMenu();
+            }
+            if(ImGui::BeginMenu("Animations")) {
+                for(std::size_t i = 0; i < size(scene.animations); ++i) {
+                    if(ImGui::MenuItem(std::to_string(i).c_str())) {
+                        animation_players.clear();
+                        auto& ap = animation_players.emplace_back();
+                        ap.animation = scene.animations[i];
+                    }
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
     }
 };
+
+inline
+void load_model(GltfProgram& program, const std::string& filepath) {
+    tinygltf::TinyGLTF loader;
+    tinygltf::Model model;
+
+    std::string err;
+    std::string warn;
+
+    bool ret = loader.LoadASCIIFromFile(
+        &model, &err, &warn, 
+        filepath
+        );
+
+    if (!warn.empty()) {
+        std::cerr << "Warning: " << warn << std::endl;
+    }
+
+    if (!err.empty()) {
+        std::cerr << "Error: " << err << std::endl;
+    }
+
+    if (!ret) {
+        std::cerr << "Failed to open GLTF file." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    program.scene = format::gltf2::fill(model);
+
+    { // Normalizing cameras.
+        for(auto& c : program.scene.cameras | std::views::values | common::views::indirect) {
+            if(auto pp = std::get_if<eng::PerspectiveProjection>(&c.projection)) {
+                pp->aspect_ratio = 16.f / 9.f;
+            }
+        }
+    }
+
+    { // Normalizing materials.
+        for(auto& mesh : program.scene.meshes | std::views::values | common::views::indirect)
+        for(auto& primitive : mesh.primitives | common::views::indirect) {
+            if(!primitive.material) {
+                primitive.material = std::make_shared<eng::Material>();
+            }
+
+            auto& m = *primitive.material;
+
+
+            for(auto& t : m.textures | std::views::values | common::views::indirect) {
+                if(!t.sampler) {
+                    t.sampler = program.default_sampler;
+                }
+            }
+
+            m.program.program = program.default_material->program.program;
+
+            if(!m.textures.contains("baseColorTexture")) {
+                auto t = eng::Texture();
+                m.textures["baseColorTexture"] = program.default_albedo_tex;
+            }
+            if(!m.textures.contains("emissiveTexture")) {
+                m.textures["emissiveTexture"] = program.default_emissive_tex;
+            }
+            if(!m.textures.contains("normalTexture")) {
+                m.textures["normalTexture"] = program.default_normal_map_tex;
+            }
+            if(!m.textures.contains("occlusionTexture")) {
+                m.textures["occlusionTexture"] = program.default_occlusion_tex;
+            }
+        }
+    }
+
+    { // Vertex attribute plumbing.
+        for(auto& mesh : program.scene.meshes | std::views::values | common::views::indirect)
+        for(auto& primitive : mesh.primitives | common::views::indirect) {
+            bind(primitive, *primitive.material);
+        }
+    }
+}
 
 void throwing_main() {
     auto p = GltfProgram();

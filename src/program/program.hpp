@@ -46,7 +46,7 @@ void run(Program& program) {
 
         program.render();
 
-        ImGui::ShowDemoWindow();
+        // ImGui::ShowDemoWindow();
 
         // Rendering
         ImGui::Render();
