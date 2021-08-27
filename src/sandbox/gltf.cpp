@@ -209,6 +209,7 @@ struct GltfProgram : Program {
             // "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf"
             // "D:/data/sample/gltf2/virtual_city/VC/glTF/VC.gltf"
             // "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf"
+            // "D:/data/sample/gltf2/CesiumMilkTruck/glTF/CesiumMilkTruck.gltf"
             
             // "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf"
 
