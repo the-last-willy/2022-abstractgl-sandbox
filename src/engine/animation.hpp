@@ -27,6 +27,15 @@ struct AnimationSampler {
     AnimationSamplerInterpolation interpolation = {};
 };
 
+inline
+float end_time(const AnimationSampler& as) {
+    if(as.input.component_type == GL_FLOAT) {
+        return max<float>(as.input).value();
+    } else {
+        throw std::runtime_error("Wrong accessor min type.");
+    }
+}
+
 struct AnimationChannel {
     std::shared_ptr<Node> target_node = {};
     AnimationTargetPath target_path = {};
@@ -39,7 +48,17 @@ struct Animation {
     std::vector<std::shared_ptr<AnimationChannel>> channels = {};
 };
 
-
+inline
+float end_time(const Animation& a) {
+    auto time = 0.f;
+    for(auto& c : a.channels) {
+        auto c_end_time = end_time(*c->sampler);
+        if(time < c_end_time) {
+            time = c_end_time;
+        }
+    }
+    return time;
+}
 
 struct AnimationInterpolation {
     std::size_t previous = {};
@@ -81,6 +100,10 @@ struct AnimationPlayer {
 
     void update(float dt) {
         time += dt;
+        auto et = end_time(*animation);
+        if(time >= et) {
+            time -= et;
+        }
     }
 };
 
