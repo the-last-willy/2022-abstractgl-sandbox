@@ -95,6 +95,12 @@ void convert_accessors(Content& content, tinygltf::Model& model) {
             throw std::runtime_error("Unhandled accessor type.");
             break;
         }
+        for(auto& mv : accessor.minValues) {
+            eng_accessor.min.push_back(static_cast<float>(mv));
+        }
+        for(auto& mv : accessor.maxValues) {
+            eng_accessor.max.push_back(static_cast<float>(mv));
+        }
         auto& buffer_view = model.bufferViews[accessor.bufferView];
         eng_accessor.buffer_view_byte_offset = agl::offset<GLintptr>(buffer_view.byteOffset);
         eng_accessor.buffer_view_byte_stride = agl::stride<GLsizei>(buffer_view.byteStride);
