@@ -1,3 +1,7 @@
 [submodule "libs/dear_imgui/dear_imgui"]
 	path = libs/dear_imgui/dear_imgui
 	url = https://github.com/ocornut/imgui.git
+[submodule "libs/glfw3/glfw3"]
+	path = libs/glfw3/glfw3
+	url = https://github.com/glfw/glfw.git
+	branch = 3.3-stable
