@@ -10,6 +10,7 @@
 #include "mesh.hpp"
 #include "node.hpp"
 #include "node.hpp"
+#include "omni_shadow_map.hpp"
 #include "scene.hpp"
 #include "texture.hpp"
 #include "transform.hpp"

@@ -16,6 +16,8 @@ struct Framebuffer {
 
     std::map<std::string, std::shared_ptr<Texture>> color_attachments = {};
 
+    std::function<void(const agl::Framebuffer&)> on_bind
+    = [](const agl::Framebuffer&) {};
     std::function<void(const agl::Framebuffer&)> on_clear
     = [](const agl::Framebuffer&) {};
 };
@@ -23,6 +25,7 @@ struct Framebuffer {
 inline
 void bind(const Framebuffer& f) {
     agl::bind(f.opengl);
+    f.on_bind(f.opengl);
 }
 
 void unbind(const Framebuffer&) {

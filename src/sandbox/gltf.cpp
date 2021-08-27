@@ -70,6 +70,12 @@ struct GltfProgram : Program {
         "D:/data/sample/gltf2/boom_box_with_axes/BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf",
         "D:/data/sample/gltf2/Buggy/glTF/Buggy.gltf",
         "D:/data/sample/gltf2/ReciprocatingSaw/glTF/ReciprocatingSaw.gltf",
+
+        "D:/data/sample/gltf2/AlphaBlendModeTest/glTF/AlphaBlendModeTest.gltf",
+        "D:/data/sample/gltf2/VertexColorTest/glTF/VertexColorTest.gltf",
+        "D:/data/sample/gltf2/TextureSettingsTest/glTF/TextureSettingsTest.gltf"
+
+
     };
 
     eng::ShaderCompiler shader_compiler = {};
@@ -110,12 +116,7 @@ struct GltfProgram : Program {
     eng::Material shadow_map_mat = {};
     int shadow_map_resolution = 4'096;
 
-    // Cube shadow map.
-    int cube_shadow_map_res = 4'096;
-    std::shared_ptr<eng::Texture> cube_shadow_map_tex = std::make_shared<eng::Texture>();;
-    eng::Material cube_shadow_map_mat = {};
-    tlw::PerspectiveProjection cube_shadow_map_proj = {};
-    std::array<tlw::View, 6> cube_shadow_map_views = {};
+    
 
     // Ambient lighting.
     eng::Material ambient_light_mat = {};
@@ -131,6 +132,9 @@ struct GltfProgram : Program {
     // Point light.
     PointLight point_light = {};
     eng::Material point_light_mat = {};
+
+    // Shadow maps.
+    eng::OmniShadowMap omni_shadow_map = eng::OmniShadowMap(4'096);
 
     // PBR.
     bool fresh_pbr_lighting_mat = true;
@@ -219,32 +223,9 @@ struct GltfProgram : Program {
                 clear(f, agl::depth_tag, 1.f); };
         }
 
-        { // Cube shadow map.
-            cube_shadow_map_tex->texture = gltf::cube_shadow_mapping_texture(cube_shadow_map_res);
-            cube_shadow_map_mat = gltf::cubic_shadow_mapping_material();
-            cube_shadow_map_mat.on_bind = [=]() {
-                glViewport(0, 0, cube_shadow_map_res, cube_shadow_map_res);
-            };
-
-            cube_shadow_map_proj.aspect_ratio = 1.f;
-
-            // X+
-            cube_shadow_map_views[0].yaw = agl::pi / 2.f;
-            // X-
-            cube_shadow_map_views[1].yaw = -agl::pi / 2.f;
-            // Y+
-            cube_shadow_map_views[2].pitch = agl::pi / 2.f;
-            // Y-
-            cube_shadow_map_views[3].pitch = -agl::pi / 2.f;
-            // Z+
-            cube_shadow_map_views[4].yaw = 0.f;
-            // Z-
-            cube_shadow_map_views[5].yaw = agl::pi;
-        }
-
         { // Skybox.
             skybox_mat = gltf::skybox_material();
-            skybox_mat.textures["cube_map"] = cube_shadow_map_tex;
+            skybox_mat.textures["cube_map"] = omni_shadow_map.texture;
         }
 
         { // Ambient light.
@@ -266,7 +247,7 @@ struct GltfProgram : Program {
             spot_light_mat = gltf::spot_lighting_material();
             for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
                 spot_light_mat.textures[name] = texture_ptr;
-            } 
+            }
             spot_light_mat.textures["shadow_map"] = spot_light.shadow_map;
         }
 
@@ -275,7 +256,7 @@ struct GltfProgram : Program {
             for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
                 point_light_mat.textures[name] = texture_ptr;
             }
-            point_light_mat.textures["shadow_map"] = cube_shadow_map_tex;
+            point_light_mat.textures["shadow_map"] = omni_shadow_map.texture;
         }
 
         { // PBR material.
@@ -308,8 +289,6 @@ struct GltfProgram : Program {
             tone_mapping_mat = gltf::tone_mapping_material();
             tone_mapping_mat.textures["hdr_map"] = hdr_tex;
         }
-
-        // glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         { // Camera.
             // SCENE CAMERA DISABLED>
@@ -509,36 +488,6 @@ struct GltfProgram : Program {
             unbind(shadow_map_mat);
         }
 
-        if constexpr(true) { // Cube shadow mapping.
-            bind(shadow_map_fb);
-
-            bind(cube_shadow_map_mat);
-            for(int face_i = 0; face_i < 6; ++face_i) {
-                texture(
-                    shadow_map_fb.opengl,
-                    agl::depth_tag,
-                    cube_shadow_map_tex->texture,
-                    agl::Level(0),
-                    face_i);
-                glClear(GL_DEPTH_BUFFER_BIT);
-
-                auto vp = transform(cube_shadow_map_proj)
-                * inverse(transform(cube_shadow_map_views[face_i]))
-                * inverse(agl::translation(point_light.position));
-
-                for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
-                    traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
-                        bind(primitive.vertex_array);
-                        auto mvp = vp * transform;
-                        uniform(cube_shadow_map_mat.program, "far", 1000.f);
-                        uniform(cube_shadow_map_mat.program, "mvp", mvp);
-                        eng::render(primitive);
-                    });
-                }
-            }
-            unbind(cube_shadow_map_mat);
-        }
-
         auto inv_v = transform(view);
         auto v = inverse(inv_v);
 
@@ -635,21 +584,50 @@ struct GltfProgram : Program {
             }
 
             if constexpr(true) { // Point lights.
-                bind(point_light_mat);
+                { // Shadow map.
+                    bind(omni_shadow_map);
+                    for(int face_i = 0; face_i < 6; ++face_i) {
+                        texture(
+                            omni_shadow_map.framebuffer.opengl,
+                            agl::depth_tag,
+                            omni_shadow_map.texture->texture,
+                            agl::Level(0),
+                            face_i);
+                        clear(omni_shadow_map.framebuffer.opengl, agl::depth_tag, 1.f);
 
-                auto light_position = v * vec4(point_light.position, 1.f);
-                uniform(point_light_mat.program, "light_position", light_position.xyz());
-                uniform(point_light_mat.program, "light_transform", inv_v);
-                uniform(point_light_mat.program, "view_position", view.position);
+                        auto vp = transform(omni_shadow_map.projection)
+                        * inverse(transform(omni_shadow_map.views[face_i]))
+                        * inverse(agl::translation(point_light.position));
 
-                bind(*fullscreen_prim);
-                draw_arrays(
-                    agl::DrawMode::triangles,
-                    agl::Offset<GLint>(0),
-                    agl::Count<GLsizei>(6));
-                unbind(*fullscreen_prim);
+                        for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+                            traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
+                                bind(primitive.vertex_array);
+                                auto mvp = vp * transform;
+                                uniform(omni_shadow_map.material.program, "far", 1000.f);
+                                uniform(omni_shadow_map.material.program, "mvp", mvp);
+                                eng::render(primitive);
+                            });
+                        }
+                    }
+                    unbind(omni_shadow_map);
+                }
+                { // Render point light.
+                    bind(point_light_mat);
 
-                unbind(point_light_mat);
+                    auto light_position = v * vec4(point_light.position, 1.f);
+                    uniform(point_light_mat.program, "light_position", light_position.xyz());
+                    uniform(point_light_mat.program, "light_transform", inv_v);
+                    uniform(point_light_mat.program, "view_position", view.position);
+
+                    bind(*fullscreen_prim);
+                    draw_arrays(
+                        agl::DrawMode::triangles,
+                        agl::Offset<GLint>(0),
+                        agl::Count<GLsizei>(6));
+                    unbind(*fullscreen_prim);
+
+                    unbind(point_light_mat);
+                }
             }
 
             // PBR.
@@ -703,7 +681,7 @@ struct GltfProgram : Program {
                     if(ImGui::MenuItem(std::to_string(i).c_str())) {
                         animation_players.clear();
                         auto& ap = animation_players.emplace_back();
-                        ap.animation = scene.animations[i];
+                        ap.animation = scene.animations[static_cast<int>(i)];
                     }
                 }
                 ImGui::EndMenu();
