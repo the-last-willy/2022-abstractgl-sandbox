@@ -599,19 +599,23 @@ struct GltfProgram : Program {
         }
     }
 
+    void traverse_all_nodes(eng::Node& n, auto f, agl::Mat4 parent_transform = mat4(agl::identity)) {
+        auto transform = parent_transform * mat4(n.transform);
+        auto it = node_animations.find(&n);
+        if(it != end(node_animations)) {
+            transform = transform * it->second;
+        }
+        if(n.mesh) {
+            f(**n.mesh, transform);
+        }
+        for(auto& c : n.children) {
+            traverse_all_nodes(*c, f, transform);
+        }
+    }
+
     void render() override {
         auto traverse_nodes = [&](eng::Node& n, auto f, agl::Mat4 parent_transform = mat4(agl::identity)) {
-            auto transform = parent_transform * mat4(n.transform);
-            auto it = node_animations.find(&n);
-            if(it != end(node_animations)) {
-                transform = transform * it->second;
-            }
-            if(n.mesh) {
-                f(**n.mesh, transform);
-            }
-            for(auto& c : n.children) {
-                traverse(*c, f, transform);
-            }
+            traverse_all_nodes(n, f, parent_transform);
         };
 
         auto traverse_scene = [&](eng::Node& n, auto f) {
