@@ -7,13 +7,14 @@ add_subdirectory(
 
 # find_package(AbstractGL REQUIRED)
 
-find_package(glfw3 3.3 REQUIRED)
+add_subdirectory(libs/glfw3)
+add_subdirectory(libs/dear_imgui)
 
 if(MSVC)
     add_compile_options(/std:c++latest /W4)
 endif()
 
-# Librabry 'common'.
+# Library 'common'.
 
 add_library(common INTERFACE)
 
@@ -28,35 +29,17 @@ INTERFACE
 target_link_libraries(common
 INTERFACE
     AbstractGL
+    dear_imgui
     glfw
 )
+
+# Executable 'dear_imgui'
+
+add_executable(dear_imgui_demo src/sandbox/dear_imgui.cpp)
+target_link_libraries(dear_imgui_demo PRIVATE common)
+
 
 # Executable 'gltf'
 
 add_executable(gltf src/sandbox/gltf.cpp)
 target_link_libraries(gltf PRIVATE common)
-
-# Executable 'lsystem'
-
-add_executable(lsystem src/sandbox/lsystem.cpp)
-target_link_libraries(lsystem PRIVATE common)
-
-# Executable 'rock'
-
-add_executable(rock src/sandbox/rock.cpp)
-target_link_libraries(rock PRIVATE common)
-
-# Executable 'terrain'
-
-add_executable(terrain src/sandbox/terrain.cpp)
-target_link_libraries(terrain PRIVATE common)
-
-# Executable 'tree'
-
-add_executable(tree src/sandbox/tree.cpp)
-target_link_libraries(tree PRIVATE common)
-
-# Executable 'tree'
-
-add_executable(tree_traversal src/sandbox/tree_traversal.cpp)
-target_link_libraries(tree_traversal PRIVATE common)
