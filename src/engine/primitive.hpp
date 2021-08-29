@@ -17,8 +17,6 @@ struct Primitive {
 
     std::shared_ptr<Material> material = {};
 
-    // Indices.
-
     eng::Accessor indices = {};
 
     agl::DrawMode draw_mode = agl::DrawMode::triangles;
@@ -45,9 +43,9 @@ void unbind(const Primitive& p) {
 inline
 void bind(Primitive& p, const Material& m) {
     for(int i = 0; i < agl::active_attributes(m.program.program); ++i) {
-        auto ai = agl::AttributeIndex(i);
-        auto aa = agl::active_attrib(m.program.program, ai);
+        auto aa = agl::active_attrib(m.program.program, agl::AttributeIndex(i));
         auto bi = agl::BindingIndex<GLuint>(i);
+        auto ai = attribute_location(m.program.program, aa.name.c_str());
         attribute_binding(p.vertex_array, ai, bi);
 
         auto it = p.attributes.find(aa.name);
