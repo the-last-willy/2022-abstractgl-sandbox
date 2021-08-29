@@ -12,6 +12,8 @@
 
 namespace eng {
 
+struct Skin;
+
 struct Node {
     std::vector<std::shared_ptr<Node>> children = {};
 
@@ -19,6 +21,7 @@ struct Node {
     
     std::optional<std::shared_ptr<Camera>> camera = std::nullopt;
     std::optional<std::shared_ptr<Mesh>> mesh = std::nullopt;
+    std::optional<std::shared_ptr<Skin>> skin = std::nullopt;
 };
 
 template<typename F>
