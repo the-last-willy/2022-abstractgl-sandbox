@@ -14,7 +14,7 @@ uniform sampler2D position_texture;
 uniform samplerCubeArray shadow_map;
 
 uniform float light_distance = 1000.;
-uniform vec3 light_intensity = vec3(1., 1., 1.);
+uniform vec3 light_intensity = 2. * vec3(1., 1., 1.);
 // View space.
 uniform vec3 light_position;
 // View space -> light space.

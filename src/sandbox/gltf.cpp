@@ -73,9 +73,11 @@ struct GltfProgram : Program {
 
         "D:/data/sample/gltf2/AlphaBlendModeTest/glTF/AlphaBlendModeTest.gltf",
         "D:/data/sample/gltf2/VertexColorTest/glTF/VertexColorTest.gltf",
-        "D:/data/sample/gltf2/TextureSettingsTest/glTF/TextureSettingsTest.gltf"
+        "D:/data/sample/gltf2/TextureSettingsTest/glTF/TextureSettingsTest.gltf",
 
-
+        "D:/data/sample/gltf2/RiggedSimple/glTF/RiggedSimple.gltf",
+        "D:/data/sample/gltf2/Fox/glTF/Fox.gltf",
+        "D:/data/sample/gltf2/BrainStem/glTF/BrainStem.gltf"
     };
 
     eng::ShaderCompiler shader_compiler = {};
@@ -393,7 +395,7 @@ struct GltfProgram : Program {
                     channel.target_node.get(),
                     agl::mat4(agl::identity));
                 if(channel.target_path == eng::AnimationTargetPath::scale) {
-                    transform = agl::mat4(agl::identity);
+                    // transform = agl::mat4(agl::identity);
                 } else if(channel.target_path == eng::AnimationTargetPath::rotation) {
                     auto prev_data = at<agl::Vec4>(
                         channel.sampler->output, interp_info.previous);
@@ -424,7 +426,39 @@ struct GltfProgram : Program {
             transform = transform * it->second;
         }
         if(n.mesh) {
-            f(**n.mesh, transform);
+            auto joint_matrices = std::vector<agl::Mat4>();
+            if(n.skin) {
+                auto inverse_transform = inverse(transform);
+                auto& skin = **n.skin;
+                joint_matrices.resize(size(skin.joints));
+                auto global_joint_transforms = std::map<eng::Joint*, agl::Mat4>();
+                auto compute = [&](
+                    const std::shared_ptr<eng::Joint>& joint_ptr,
+                    const agl::Mat4& parent_transform, const auto& rec) -> void
+                {
+                    auto& transform 
+                    = global_joint_transforms[joint_ptr.get()]
+                    = parent_transform * mat4(joint_ptr->node->transform);
+                    {
+                        auto it = node_animations.find(joint_ptr->node.get());
+                        if(it != end(node_animations)) {
+                            transform = transform * it->second;
+                        }
+                    }
+                    for(auto& c : joint_ptr->children) {
+                        rec(c, transform, rec);
+                    }
+                };
+                compute(*skin.skeleton, agl::mat4(agl::identity), compute);
+                for(std::size_t i = 0; i < size(skin.joints); ++i) {
+                    joint_matrices[i] = inverse_transform
+                    * global_joint_transforms.at(skin.joints[i].get())
+                    * at<agl::Mat4>(*skin.inverse_bind_matrices, i);
+                }
+            }
+            for(auto& primitive : (**n.mesh).primitives | common::views::indirect) {
+                f(primitive, transform, joint_matrices);
+            }
         }
         for(auto& c : n.children) {
             traverse_all_nodes(*c, f, transform);
@@ -432,16 +466,8 @@ struct GltfProgram : Program {
     }
 
     void render() override {
-        auto traverse_nodes = [&](eng::Node& n, auto f, agl::Mat4 parent_transform = mat4(agl::identity)) {
-            traverse_all_nodes(n, f, parent_transform);
-        };
-
         auto traverse_scene = [&](eng::Node& n, auto f) {
-            traverse_nodes(n, [&, f](const eng::Mesh& m, const agl::Mat4& transform) {
-                for(auto& primitive : m.primitives | common::views::indirect) {
-                    f(primitive, transform);
-                }
-            });
+            traverse_all_nodes(n, f);
         };
 
         if constexpr(false) { // Shadow map.
@@ -455,7 +481,7 @@ struct GltfProgram : Program {
 
             bind(shadow_map_mat);
             for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
-                traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
+                traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform, const std::vector<agl::Mat4>&) {
                     bind(primitive);
                     auto mvp = dir_light.transform * transform;
                     uniform(shadow_map_mat.program, "mvp", mvp);
@@ -477,7 +503,7 @@ struct GltfProgram : Program {
 
             bind(shadow_map_mat);
             for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
-                traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
+                traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform, const std::vector<agl::Mat4>&) {
                     bind(primitive.vertex_array);
                     auto mvp = spot_light.transform * transform;
                     uniform(shadow_map_mat.program, "mvp", mvp);
@@ -486,6 +512,34 @@ struct GltfProgram : Program {
                 });
             }
             unbind(shadow_map_mat);
+        }
+
+        if constexpr(true) { // Cube shadow mapping.
+            bind(omni_shadow_map);
+            for(int face_i = 0; face_i < 6; ++face_i) {
+                texture(
+                    omni_shadow_map.framebuffer.opengl,
+                    agl::depth_tag,
+                    omni_shadow_map.texture->texture,
+                    agl::Level(0),
+                    face_i);
+                clear(omni_shadow_map.framebuffer.opengl, agl::depth_tag, 1.f);
+
+                auto vp = transform(omni_shadow_map.projection)
+                * inverse(transform(omni_shadow_map.views[face_i]))
+                * inverse(agl::translation(point_light.position));
+
+                for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+                    traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform, const std::vector<agl::Mat4>&) {
+                        bind(primitive.vertex_array);
+                        auto mvp = vp * transform;
+                        uniform(omni_shadow_map.material.program, "far", 1000.f);
+                        uniform(omni_shadow_map.material.program, "mvp", mvp);
+                        eng::render(primitive);
+                    });
+                }
+            }
+            unbind(omni_shadow_map);
         }
 
         auto inv_v = transform(view);
@@ -500,11 +554,45 @@ struct GltfProgram : Program {
             glClear(GL_COLOR_BUFFER_BIT);
 
             for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
-                traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
+                traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform, const std::vector<agl::Mat4>& joint_transforms) {
                     if(primitive.material) {
                         auto& m = *primitive.material;
                         bind(primitive);
                         auto mv = v * transform;
+                        if(not empty(joint_transforms)) {
+                            auto ul = uniform_location(
+                                primitive.material->program.program,
+                                "joint_matrices");
+                            glProgramUniformMatrix4fv(
+                                primitive.material->program.program,
+                                *ul,
+                                static_cast<GLsizei>(size(joint_transforms)),
+                                GL_FALSE,
+                                reinterpret_cast<const float*>(data(joint_transforms)));
+                            // auto buffer = create(agl::buffer_tag);
+                            // storage(buffer, std::span(joint_transforms));
+                            // glUniformBlockBinding( 
+                            //     primitive.material->program.program,
+                            //     glGetUniformBlockIndex(
+                            //         primitive.material->program.program,
+                            //         "joint_transforms"),
+                            //     buffer);
+                        } else {
+                            auto identities = std::array<agl::Mat4, 16>{
+                                mat4(agl::identity), mat4(agl::identity), mat4(agl::identity), mat4(agl::identity), 
+                                mat4(agl::identity), mat4(agl::identity), mat4(agl::identity), mat4(agl::identity), 
+                                mat4(agl::identity), mat4(agl::identity), mat4(agl::identity), mat4(agl::identity), 
+                                mat4(agl::identity), mat4(agl::identity), mat4(agl::identity), mat4(agl::identity)};
+                            auto ul = uniform_location(
+                                primitive.material->program.program,
+                                "joint_matrices");
+                            glProgramUniformMatrix4fv(
+                                primitive.material->program.program,
+                                *ul,
+                                static_cast<GLsizei>(size(identities)),
+                                GL_FALSE,
+                                reinterpret_cast<const float*>(data(identities)));
+                        }
                         uniform(m.program, "mv", mv);
                         uniform(m.program, "mvp", vp * transform);
                         auto normal_transform = transpose(inverse(mv));
@@ -584,50 +672,21 @@ struct GltfProgram : Program {
             }
 
             if constexpr(true) { // Point lights.
-                { // Shadow map.
-                    bind(omni_shadow_map);
-                    for(int face_i = 0; face_i < 6; ++face_i) {
-                        texture(
-                            omni_shadow_map.framebuffer.opengl,
-                            agl::depth_tag,
-                            omni_shadow_map.texture->texture,
-                            agl::Level(0),
-                            face_i);
-                        clear(omni_shadow_map.framebuffer.opengl, agl::depth_tag, 1.f);
+                bind(point_light_mat);
 
-                        auto vp = transform(omni_shadow_map.projection)
-                        * inverse(transform(omni_shadow_map.views[face_i]))
-                        * inverse(agl::translation(point_light.position));
+                auto light_position = v * vec4(point_light.position, 1.f);
+                uniform(point_light_mat.program, "light_position", light_position.xyz());
+                uniform(point_light_mat.program, "light_transform", inv_v);
+                uniform(point_light_mat.program, "view_position", view.position);
 
-                        for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
-                            traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform) {
-                                bind(primitive.vertex_array);
-                                auto mvp = vp * transform;
-                                uniform(omni_shadow_map.material.program, "far", 1000.f);
-                                uniform(omni_shadow_map.material.program, "mvp", mvp);
-                                eng::render(primitive);
-                            });
-                        }
-                    }
-                    unbind(omni_shadow_map);
-                }
-                { // Render point light.
-                    bind(point_light_mat);
+                bind(*fullscreen_prim);
+                draw_arrays(
+                    agl::DrawMode::triangles,
+                    agl::Offset<GLint>(0),
+                    agl::Count<GLsizei>(6));
+                unbind(*fullscreen_prim);
 
-                    auto light_position = v * vec4(point_light.position, 1.f);
-                    uniform(point_light_mat.program, "light_position", light_position.xyz());
-                    uniform(point_light_mat.program, "light_transform", inv_v);
-                    uniform(point_light_mat.program, "view_position", view.position);
-
-                    bind(*fullscreen_prim);
-                    draw_arrays(
-                        agl::DrawMode::triangles,
-                        agl::Offset<GLint>(0),
-                        agl::Count<GLsizei>(6));
-                    unbind(*fullscreen_prim);
-
-                    unbind(point_light_mat);
-                }
+                unbind(point_light_mat);
             }
 
             // PBR.

@@ -22,6 +22,7 @@ struct Content {
     std::map<int, std::shared_ptr<eng::Node>> nodes = {};
     std::map<int, agl::Sampler> samplers = {};
     std::map<int, std::shared_ptr<eng::Scene>> scenes = {};
+    std::map<int, std::shared_ptr<eng::Skin>> skins = {};
     std::map<int, std::shared_ptr<eng::Texture>> textures = {};
 };
 
@@ -79,6 +80,9 @@ void convert_accessors(Content& content, tinygltf::Model& model) {
         eng_accessor.byte_offset = agl::Offset<GLuint>(static_cast<GLuint>(accessor.byteOffset));
         eng_accessor.normalized = agl::Normalized(accessor.normalized);
         switch(accessor.type) {
+        case TINYGLTF_TYPE_MAT4:
+            eng_accessor.component_count = agl::Size<GLint>(16);
+            break;
         case TINYGLTF_TYPE_SCALAR:
             eng_accessor.component_count = agl::Size<GLint>(1);
             break;
@@ -302,7 +306,7 @@ void convert_meshes(Content& content, tinygltf::Model& model) {
             }
             auto gl_vertex_array = eng_primitive.vertex_array = agl::vertex_array();
 
-            { // Indices.
+            {
                 auto& accessor = model.accessors[primitive.indices];
                 auto& buffer_view = model.bufferViews[accessor.bufferView];
                 if(accessor.componentType == GL_UNSIGNED_BYTE) {
@@ -370,29 +374,6 @@ void convert_nodes(Content& content, tinygltf::Model& model) {
                     static_cast<float>(node.translation[2]));
             }
             if(size(node.rotation) == 4) {
-                // auto a = static_cast<float>(node.rotation[3]);
-                // auto b = static_cast<float>(node.rotation[0]);
-                // auto c = static_cast<float>(node.rotation[1]);
-                // auto d = static_cast<float>(node.rotation[2]);
-                
-                // auto aa = a * a;
-                // auto bb = b * b;
-                // auto cc = c * c;
-                // auto dd = d * d;
-                
-                // auto ab = 2.f * a * b;
-                // auto ac = 2.f * a * c;
-                // auto ad = 2.f * a * d;
-                // auto bc = 2.f * b * c;
-                // auto bd = 2.f * b * d;
-                // auto cd = 2.f * c * d;
-
-                // eng_node.transform = eng_node.transform * agl::mat4(
-                //     aa + bb - cc - dd,           bc + ad,           bd - ac, 0.f,
-                //                 bc - ad, aa - bb + cc - dd,           cd + ab, 0.f,
-                //                 bd + ac,           cd - ab, aa - bb - cc + dd, 0.f,
-                //                     0.f,                             0.f, 0.f, 1.f);
-                
                 eng_node.transform = eng_node.transform
                 * agl::mat4(agl::Quaternion(
                     static_cast<float>(node.rotation[3]),
@@ -413,6 +394,9 @@ void convert_nodes(Content& content, tinygltf::Model& model) {
         }
         if(node.mesh != -1) {
             eng_node.mesh = content.meshes.at(node.mesh);
+        }
+        if(node.skin != -1) {
+            eng_node.skin = content.skins.at(node.skin);
         }
     }
 }
@@ -446,6 +430,58 @@ void convert_scenes(Content& content, tinygltf::Model& model) {
     }
 }
 
+// Requires accessors, nodes.
+inline
+void convert_skins(Content& content, tinygltf::Model& model) {
+    for(std::size_t i = 0; i < size(model.skins); ++i) {
+        auto& skin = model.skins[i];
+        auto& eng_skin = *content.skins[static_cast<int>(i)];
+        if(skin.inverseBindMatrices != -1) {
+            eng_skin.inverse_bind_matrices
+            = content.accessors.at(skin.inverseBindMatrices);
+        }
+        auto joints = std::map<int, std::shared_ptr<eng::Joint>>{};
+        for(auto id : skin.joints) {
+            auto& eng_joint_ptr = joints[static_cast<int>(id)]
+                = std::make_shared<eng::Joint>();
+            eng_joint_ptr->node = content.nodes.at(id);
+            eng_skin.joints.push_back(eng_joint_ptr);
+        }
+        for(std::size_t j = 0; j < size(skin.joints); ++j) {
+            auto& eng_joint_ptr = joints.at(skin.joints[j]);
+            for(auto id : model.nodes[skin.joints[j]].children) {
+                auto& eng_joint = joints.at(id);
+                if(eng_joint->parent) {
+                    throw std::runtime_error(
+                        "Skeleton joint with mutliple parents.");
+                } else {
+                    eng_joint->parent = eng_joint_ptr;
+                    eng_joint_ptr->children.push_back(eng_joint);
+                }
+            }
+        }
+        if(skin.skeleton == -1) {
+            throw std::runtime_error(
+                "No skeleton root node.");
+        } else {
+            auto it = joints.find(skin.skeleton);
+            if(it == end(joints)) {
+                auto& skeleton = *(eng_skin.skeleton
+                    = std::make_shared<eng::Joint>());
+                skeleton->node = content.nodes.at(skin.skeleton);
+                for(auto id : model.nodes[skin.skeleton].children) {
+                    auto& eng_joint = joints.at(id);
+                    eng_joint->parent = skeleton;
+                    skeleton->children.push_back(eng_joint);
+                }
+            } else {
+                eng_skin.skeleton = it->second;
+            }
+        }
+        compute_transforms(**eng_skin.skeleton);
+    }
+}
+
 inline
 void convert_textures(Content& content, tinygltf::Model& model) {
     for(std::size_t i = 0; i < size(model.textures); ++i) {
@@ -462,6 +498,12 @@ void convert_textures(Content& content, tinygltf::Model& model) {
 inline
 auto fill(tinygltf::Model& model) {
     auto content = Content();
+
+    // Circular dependencies.
+    for(std::size_t i = 0; i < size(model.skins); ++i) {
+        content.skins[static_cast<int>(i)] = std::make_shared<eng::Skin>();
+    }
+
     convert_buffers(content, model);
     convert_images(content, model);
     convert_samplers(content, model);
@@ -473,6 +515,7 @@ auto fill(tinygltf::Model& model) {
     convert_nodes(content, model);
     convert_scenes(content, model);
     convert_animations(content, model);
+    convert_skins(content, model);
     return content;
 }
 
