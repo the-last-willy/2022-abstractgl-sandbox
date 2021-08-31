@@ -1,17 +1,16 @@
 cmake_minimum_required(VERSION 3.15.0)
 project(sandbox VERSION 0.1.0)
 
-add_subdirectory(
-    "D:/dev/project/abstractgl"
-    "D:/dev/project/abstractgl/build")
-
-# find_package(AbstractGL REQUIRED)
-
-add_subdirectory(libs/glfw3)
+add_subdirectory(libs/abstractgl)
 add_subdirectory(libs/dear_imgui)
+add_subdirectory(libs/glad)
+add_subdirectory(libs/glfw3)
+add_subdirectory(libs/tinygltf)
 
 if(MSVC)
     add_compile_options(/std:c++latest /W4)
+elseif()
+    add_compile_options(/std=c++20 /Wall)
 endif()
 
 # Library 'common'.
@@ -20,17 +19,16 @@ add_library(common INTERFACE)
 
 target_include_directories(common
 INTERFACE
-    libs/stb
-    libs/tiny_obj_loader-1.0.7
-    libs/tinygltf
     src
 )
 
 target_link_libraries(common
 INTERFACE
-    AbstractGL
+    abstractgl
     dear_imgui
+    glad
     glfw
+    tinygltf
 )
 
 # Executable 'dear_imgui'
