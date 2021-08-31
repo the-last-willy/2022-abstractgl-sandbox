@@ -6,6 +6,7 @@
 #include <tiny_gltf.h>
 
 #include <algorithm>
+#include <iomanip>
 #include <map>
 #include <memory>
 
@@ -213,6 +214,23 @@ void convert_materials(Content& content, tinygltf::Model& model) {
         eng_material.program.capabilities.emplace_back(
             agl::Capability::depth_test, []() {
                 glDepthFunc(GL_LESS); });
+        { // 'alphaMode'.
+            auto& am = material.alphaMode;
+            if       (am == "BLEND") {
+                eng_material.alpha_mode = eng::AlphaMode::blend;
+                eng_material.uniforms["alphaMode"] = new eng::Uniform<int>(0);
+            } else if(am == "MASK") {
+                eng_material.alpha_mode = eng::AlphaMode::mask;
+                eng_material.uniforms["alphaCutoff"] = new eng::Uniform<float>(
+                    static_cast<float>(material.alphaCutoff));
+                eng_material.uniforms["alphaMode"] = new eng::Uniform<int>(1);
+            } else if(am == "OPAQUE") {
+                eng_material.alpha_mode = eng::AlphaMode::opaque;
+                eng_material.uniforms["alphaMode"] = new eng::Uniform<int>(2);
+            } else {
+                throw std::runtime_error("Unsupported alpha mode.");
+            }
+        }
         { // 'doubleSided'.
             if(!material.doubleSided) {
                 eng_material.program.capabilities.push_back({
@@ -306,7 +324,12 @@ void convert_meshes(Content& content, tinygltf::Model& model) {
             }
             auto gl_vertex_array = eng_primitive.vertex_array = agl::vertex_array();
 
-            {
+            if(primitive.indices == -1) {
+                auto& first_accessor = model.accessors[
+                    begin(primitive.attributes)->second];
+                eng_primitive.primitive_count = agl::Count<GLsizei>(
+                    static_cast<GLsizei>(first_accessor.count));
+            } else {
                 auto& accessor = model.accessors[primitive.indices];
                 auto& buffer_view = model.bufferViews[accessor.bufferView];
                 if(accessor.componentType == GL_UNSIGNED_BYTE) {
@@ -367,27 +390,28 @@ void convert_nodes(Content& content, tinygltf::Model& model) {
                 m(8), m(9), m(10), m(11), 
                 m(12), m(13), m(14), m(15));
         } else {
+            auto transform = eng::TransformTRS();
             if(size(node.translation) == 3) {
-                eng_node.transform = eng_node.transform * agl::translation(
+                transform.translation = agl::vec3(
                     static_cast<float>(node.translation[0]),
                     static_cast<float>(node.translation[1]),
                     static_cast<float>(node.translation[2]));
             }
             if(size(node.rotation) == 4) {
-                eng_node.transform = eng_node.transform
-                * agl::mat4(agl::Quaternion(
+                transform.rotation = agl::Quaternion(
                     static_cast<float>(node.rotation[3]),
                     agl::vec3(
                         static_cast<float>(node.rotation[0]),
                         static_cast<float>(node.rotation[1]),
-                        static_cast<float>(node.rotation[2]))));
+                        static_cast<float>(node.rotation[2])));
             }
             if(size(node.scale) == 3) {
-                eng_node.transform = eng_node.transform *  agl::scaling3(
+                transform.scaling = agl::vec3(
                     static_cast<float>(node.scale[0]),
                     static_cast<float>(node.scale[1]),
                     static_cast<float>(node.scale[2]));
             }
+            eng_node.transform = std::move(transform);
         }
         if(node.camera != -1) {
             eng_node.camera = content.cameras.at(node.camera);
@@ -439,46 +463,26 @@ void convert_skins(Content& content, tinygltf::Model& model) {
         if(skin.inverseBindMatrices != -1) {
             eng_skin.inverse_bind_matrices
             = content.accessors.at(skin.inverseBindMatrices);
-        }
-        auto joints = std::map<int, std::shared_ptr<eng::Joint>>{};
-        for(auto id : skin.joints) {
-            auto& eng_joint_ptr = joints[static_cast<int>(id)]
-                = std::make_shared<eng::Joint>();
-            eng_joint_ptr->node = content.nodes.at(id);
-            eng_skin.joints.push_back(eng_joint_ptr);
-        }
-        for(std::size_t j = 0; j < size(skin.joints); ++j) {
-            auto& eng_joint_ptr = joints.at(skin.joints[j]);
-            for(auto id : model.nodes[skin.joints[j]].children) {
-                auto& eng_joint = joints.at(id);
-                if(eng_joint->parent) {
-                    throw std::runtime_error(
-                        "Skeleton joint with mutliple parents.");
-                } else {
-                    eng_joint->parent = eng_joint_ptr;
-                    eng_joint_ptr->children.push_back(eng_joint);
+
+            for(std::size_t j = 0; j < eng_skin.inverse_bind_matrices.count; ++j) {
+                auto& ibm = at<agl::Mat4>(eng_skin.inverse_bind_matrices, j);
+                for(std::size_t r = 0; r < 4; ++r) {
+                    for(std::size_t c = 0; c < 4; ++c) {
+                        std::cout << std::setprecision(6) << std::setw(15) << ibm[c][r] << " ";
+                    }
+                    std::cout << std::endl;
                 }
+                endl(std::cout);
             }
+        }
+        for(auto& node_id : skin.joints) {
+            eng_skin.joints.push_back(content.nodes.at(node_id));
         }
         if(skin.skeleton == -1) {
-            throw std::runtime_error(
-                "No skeleton root node.");
+            
         } else {
-            auto it = joints.find(skin.skeleton);
-            if(it == end(joints)) {
-                auto& skeleton = *(eng_skin.skeleton
-                    = std::make_shared<eng::Joint>());
-                skeleton->node = content.nodes.at(skin.skeleton);
-                for(auto id : model.nodes[skin.skeleton].children) {
-                    auto& eng_joint = joints.at(id);
-                    eng_joint->parent = skeleton;
-                    skeleton->children.push_back(eng_joint);
-                }
-            } else {
-                eng_skin.skeleton = it->second;
-            }
+            eng_skin.skeleton = content.nodes.at(skin.skeleton);
         }
-        compute_transforms(**eng_skin.skeleton);
     }
 }
 

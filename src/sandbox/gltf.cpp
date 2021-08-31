@@ -77,7 +77,14 @@ struct GltfProgram : Program {
 
         "D:/data/sample/gltf2/RiggedSimple/glTF/RiggedSimple.gltf",
         "D:/data/sample/gltf2/Fox/glTF/Fox.gltf",
-        "D:/data/sample/gltf2/BrainStem/glTF/BrainStem.gltf"
+        "D:/data/sample/gltf2/BrainStem/glTF/BrainStem.gltf",
+
+        "D:/data/sample/gltf2/SimpleSkin/glTF/SimpleSkin.gltf",
+        "D:/data/sample/gltf2/CesiumMan/glTF/CesiumMan.gltf",
+        "D:/data/sample/gltf2/RiggedFigure/glTF/RiggedFigure.gltf",
+
+        "D:/data/sample/gltf2/InterpolationTest/glTF/InterpolationTest.gltf",
+        "D:/data/sample/gltf2/WaterBottle/glTF/WaterBottle.gltf"
     };
 
     eng::ShaderCompiler shader_compiler = {};
@@ -151,7 +158,10 @@ struct GltfProgram : Program {
 
     // Animation.
     std::vector<eng::AnimationPlayer> animation_players = {};
-    std::map<const eng::Node*, agl::Mat4> node_animations = {};
+    std::map<const eng::Node*, eng::Transform> node_animations = {};
+
+    // Settings.
+    bool skinning_enabled = true;
     
     void init() override {
         { // Shader compiler.
@@ -313,8 +323,6 @@ struct GltfProgram : Program {
                 traverse_scene(n);
             }
         }
-
-        
     }
 
     void update(float dt) override {
@@ -335,8 +343,8 @@ struct GltfProgram : Program {
                 view.position = view.position - direction / 10.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_D)) {
-                auto direction = (rotation(view) * agl::rotation_y(-agl::pi / 2.f))[2].xyz();
-                view.position = view.position - direction / 10.f;
+                auto direction = (rotation(view) * agl::rotation_y(agl::pi / 2.f))[2].xyz();
+                view.position = view.position + direction / 10.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_S)) {
                 auto direction = rotation(view)[2].xyz();
@@ -393,67 +401,83 @@ struct GltfProgram : Program {
                 auto& transform = common::find_or_insert(
                     node_animations,
                     channel.target_node.get(),
-                    agl::mat4(agl::identity));
+                    channel.target_node->transform);
+                auto& trs = std::get<eng::TransformTRS>(transform.representation);
                 if(channel.target_path == eng::AnimationTargetPath::scale) {
-                    // transform = agl::mat4(agl::identity);
+                    trs.scaling = agl::mix(
+                        at<agl::Vec3>(
+                            channel.sampler->output,
+                            interp_info.previous),
+                        at<agl::Vec3>(
+                            channel.sampler->output,
+                            interp_info.next),
+                        interp_info.t);
                 } else if(channel.target_path == eng::AnimationTargetPath::rotation) {
                     auto prev_data = at<agl::Vec4>(
                         channel.sampler->output, interp_info.previous);
                     auto prev_q = agl::Quaternion<float>(
-                        prev_data[3], agl::vec3(prev_data[0], prev_data[1], prev_data[2]));
+                        prev_data[3],
+                        agl::vec3(prev_data[0], prev_data[1], prev_data[2]));
                     auto next_data = at<agl::Vec4>(
                         channel.sampler->output, interp_info.next);
                     auto next_q = agl::Quaternion<float>(
-                        next_data[3], agl::vec3(next_data[0], next_data[1], next_data[2]));
-                    auto s = agl::slerp(prev_q, next_q, interp_info.t);
-                    transform = transform * agl::mat4(
-                        agl::slerp(prev_q, next_q, interp_info.t));
+                        next_data[3],
+                        agl::vec3(next_data[0], next_data[1], next_data[2]));
+                    trs.rotation = agl::slerp(
+                        prev_q, next_q, interp_info.t);
                 } else if(channel.target_path == eng::AnimationTargetPath::translation) {
-                    auto prev = agl::translation(at<agl::Vec3>(
-                        channel.sampler->output, interp_info.previous));
-                    auto next = agl::translation(at<agl::Vec3>(
-                        channel.sampler->output, interp_info.next));
-                    transform = agl::mix(prev, next, interp_info.t) * transform;
+                    trs.translation = agl::mix(
+                        at<agl::Vec3>(
+                            channel.sampler->output,
+                            interp_info.previous),
+                        at<agl::Vec3>(
+                            channel.sampler->output,
+                            interp_info.next),
+                        interp_info.t);
                 }
             }
         }
     }
 
     void traverse_all_nodes(eng::Node& n, auto f, agl::Mat4 parent_transform = mat4(agl::identity)) {
-        auto transform = parent_transform * mat4(n.transform);
+        auto transform = parent_transform;
         auto it = node_animations.find(&n);
         if(it != end(node_animations)) {
-            transform = transform * it->second;
+            transform = transform * mat4(it->second);
+        } else {
+            transform = transform * mat4(n.transform);
         }
         if(n.mesh) {
             auto joint_matrices = std::vector<agl::Mat4>();
-            if(n.skin) {
+            if(skinning_enabled and n.skin) {
                 auto inverse_transform = inverse(transform);
                 auto& skin = **n.skin;
                 joint_matrices.resize(size(skin.joints));
-                auto global_joint_transforms = std::map<eng::Joint*, agl::Mat4>();
+                auto global_joint_transforms = std::map<eng::Node*, agl::Mat4>();
                 auto compute = [&](
-                    const std::shared_ptr<eng::Joint>& joint_ptr,
+                    const std::shared_ptr<eng::Node>& node_ptr,
                     const agl::Mat4& parent_transform, const auto& rec) -> void
                 {
                     auto& transform 
-                    = global_joint_transforms[joint_ptr.get()]
-                    = parent_transform * mat4(joint_ptr->node->transform);
+                    = global_joint_transforms[node_ptr.get()]
+                    = parent_transform;
                     {
-                        auto it = node_animations.find(joint_ptr->node.get());
+                        auto it = node_animations.find(node_ptr.get());
                         if(it != end(node_animations)) {
-                            transform = transform * it->second;
+                            transform = transform * mat4(it->second);
+                        } else {
+                            transform = transform * mat4(node_ptr->transform);
                         }
                     }
-                    for(auto& c : joint_ptr->children) {
+                    for(auto& c : node_ptr->children) {
                         rec(c, transform, rec);
                     }
                 };
-                compute(*skin.skeleton, agl::mat4(agl::identity), compute);
+                compute(skin.skeleton, transform, compute);
                 for(std::size_t i = 0; i < size(skin.joints); ++i) {
                     joint_matrices[i] = inverse_transform
                     * global_joint_transforms.at(skin.joints[i].get())
-                    * at<agl::Mat4>(*skin.inverse_bind_matrices, i);
+                    * at<agl::Mat4>(skin.inverse_bind_matrices, i);
                 }
             }
             for(auto& primitive : (**n.mesh).primitives | common::views::indirect) {
@@ -569,14 +593,6 @@ struct GltfProgram : Program {
                                 static_cast<GLsizei>(size(joint_transforms)),
                                 GL_FALSE,
                                 reinterpret_cast<const float*>(data(joint_transforms)));
-                            // auto buffer = create(agl::buffer_tag);
-                            // storage(buffer, std::span(joint_transforms));
-                            // glUniformBlockBinding( 
-                            //     primitive.material->program.program,
-                            //     glGetUniformBlockIndex(
-                            //         primitive.material->program.program,
-                            //         "joint_transforms"),
-                            //     buffer);
                         } else {
                             auto identities = std::array<agl::Mat4, 16>{
                                 mat4(agl::identity), mat4(agl::identity), mat4(agl::identity), mat4(agl::identity), 
@@ -743,6 +759,10 @@ struct GltfProgram : Program {
                         ap.animation = scene.animations[static_cast<int>(i)];
                     }
                 }
+                ImGui::EndMenu();
+            }
+            if(ImGui::BeginMenu("Settings")) {
+                ImGui::Checkbox("Skinning", &skinning_enabled);
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();

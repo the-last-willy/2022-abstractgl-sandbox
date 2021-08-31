@@ -24,12 +24,16 @@ void main() {
     + WEIGHTS_0[2] * joint_matrices[int(JOINTS_0[2])]
     + WEIGHTS_0[3] * joint_matrices[int(JOINTS_0[3])];
 
-    vertex_normal = normalize((normal_transform * vec4(NORMAL, 0.)).xyz);
-    vertex_position = (mv * vec4(POSITION, 1.)).xyz;
+    mat4 normal_skinning = mat4(
+        skinning[0], skinning[1], skinning[2], vec4(0., 0., 0., 1.));
+    normal_skinning = transpose(inverse(normal_skinning));
+
+    vertex_normal = normalize((normal_transform * normal_skinning * vec4(NORMAL, 0.)).xyz);
+    vertex_position = (mv * skinning * vec4(POSITION, 1.)).xyz;
     vertex_tangent = vec4(
-        normalize((normal_transform * vec4(TANGENT.xyz, 0.)).xyz),
+        normalize((normal_transform * normal_skinning * vec4(TANGENT.xyz, 0.)).xyz),
         TANGENT.w);
     vertex_texcoord = TEXCOORD_0;
 
-    gl_Position = mvp * vec4(POSITION, 1.);
+    gl_Position = mvp * skinning * vec4(POSITION, 1.);
 }

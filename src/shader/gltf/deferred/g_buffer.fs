@@ -6,6 +6,8 @@ uniform sampler2D metallicRoughnessTexture;
 uniform sampler2D occlusionTexture;
 uniform sampler2D normalTexture;
 
+uniform float alphaCutoff = 0.5;
+uniform int alphaMode = 0; // {BLEND, CUTOFF, OPAQUE}.
 uniform vec4 baseColorFactor = vec4(1., 1., 1., 1.);
 
 in vec3 vertex_normal;
@@ -33,9 +35,15 @@ void main() {
 
     {
         vec4 albedo = baseColorFactor * texture(baseColorTexture, vertex_texcoord);
-        if(albedo.a < .6) {
-            discard;
-        } else {
+        if(alphaMode == 0) {
+
+        } else if(alphaMode == 1) {
+            if(albedo.a < alphaCutoff) {
+                discard;
+            } else {
+                albedo_texture = albedo.rgb;
+            }
+        } else if(alphaMode == 2) {
             albedo_texture = albedo.rgb;
         }
     }

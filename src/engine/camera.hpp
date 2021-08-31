@@ -29,24 +29,24 @@ auto transform(const PerspectiveProjection& op) {
         auto n = op.z_near;
         auto f = *op.z_far;
 
-        auto tan_y = std::tan(y / 2.f);
-        auto e33 = -(n + f) / (n - f);
+        auto inv_tan_y = 1.f / std::tan(y / 2.f);
+        auto e33 = (n + f) / (n - f);
         auto e43 = 2.f * n * f / (n - f);
 
         // SPECIFICATION.
         // return agl::mat4(
-        //     1.f / (a * tan_y),         0.f, 0.f, 0.f,
-        //                   0.f, 1.f / tan_y, 0.f, 0.f,
-        //                   0.f,         0.f, e33, 1.f,
-        //                   0.f,         0.f, e43, 0.f);
+        //     inv_tan_y / a,       0.f, 0.f,  0.f,
+        //               0.f, inv_tan_y, 0.f,  0.f,
+        //               0.f,       0.f, e33, -1.f,
+        //               0.f,       0.f, e43,  0.f);
 
         // MINE USES X_FOV INSTEAD. FIX IT, YOU LAZY BUN. TODO;
         (void) a;
-        (void) tan_y;
+        (void) inv_tan_y;
         return agl::mat4(
             1.f,         0.f, 0.f, 0.f,
                           0.f, op.aspect_ratio, 0.f, 0.f,
-                          0.f,         0.f, e33, 1.f,
+                          0.f,         0.f, -e33, 1.f,
                           0.f,         0.f, e43, 0.f);
     } else {
         throw std::runtime_error("Not implemented infinite perspective projection.");

@@ -3,7 +3,7 @@
 uniform mat4 mvp;
 
 // LOCATION TIED TO G_BUFFER SHADER.
-layout(location = 1) in vec3 POSITION;
+layout(location = 2) in vec3 POSITION;
 
 out vec3 vertex_pos;
 

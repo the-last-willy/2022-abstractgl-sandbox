@@ -13,8 +13,16 @@
 
 namespace eng {
 
+enum class AlphaMode {
+    blend,
+    mask,
+    opaque  
+};
+
 struct Material {
-    eng::Program program = {};
+    AlphaMode alpha_mode = AlphaMode::opaque;
+
+    Program program = {};
 
     std::map<std::string, std::shared_ptr<eng::Texture>> textures = {};
 
