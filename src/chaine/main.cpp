@@ -72,7 +72,7 @@ struct App : Program {
 
         drawable_mesh->primitives[0]->material = material;
 
-        auto f = format::off::read("C:/Users/Willy/Downloads/queen.off");
+        auto f = format::off::read(local::root_folder + "/data/queen.off");
         std::cout << std::endl;
     }
 
