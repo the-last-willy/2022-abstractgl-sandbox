@@ -31,6 +31,11 @@ INTERFACE
     tinygltf
 )
 
+# Executable 'chaine'.
+
+add_executable(chaine src/chaine/main.cpp)
+target_link_libraries(chaine PRIVATE common)
+
 # Executable 'dear_imgui'
 
 add_executable(dear_imgui_demo src/sandbox/dear_imgui.cpp)

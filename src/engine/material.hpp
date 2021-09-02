@@ -22,6 +22,7 @@ enum class AlphaMode {
 struct Material {
     AlphaMode alpha_mode = AlphaMode::opaque;
 
+    // SHOULD BE REMOVED.
     Program program = {};
 
     std::map<std::string, std::shared_ptr<eng::Texture>> textures = {};

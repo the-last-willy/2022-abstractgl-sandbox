@@ -5,6 +5,7 @@
 #include <agl/all.hpp>
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace eng {

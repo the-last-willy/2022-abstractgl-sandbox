@@ -108,8 +108,11 @@ void error_callback(
         break;
     }
 
-    printf("%d: %s of %s severity, raised from %s: %s\n",
-            id, _type, _severity, _source, msg);
+    std::cerr << id
+    << ": " << _type
+    << " of " << _severity
+    << " severity, raised from " << _source
+    << ": " << msg << std::endl;
 
     if(throwing) {
         throw std::exception();
