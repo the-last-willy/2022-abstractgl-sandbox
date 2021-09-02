@@ -11,6 +11,7 @@
 namespace eng {
 
 struct Primitive {
+    // SHOULDN'T BE IN HERE.
     agl::VertexArray vertex_array = {};
 
     std::map<std::string, eng::Accessor> attributes = {};
@@ -85,6 +86,23 @@ inline
 void render(const Primitive& p) {
     auto b = agl::element_array_buffer_binding(p.vertex_array);
     if(agl::element_array_buffer_binding(p.vertex_array)) {
+        agl::draw_elements(
+            p.draw_mode,
+            p.primitive_count,
+            p.draw_type,
+            agl::Offset<GLintptr>(p.offset));
+    } else {
+        agl::draw_arrays(
+            p.draw_mode,
+            agl::Offset<GLint>(static_cast<GLint>(p.offset)),
+            p.primitive_count);
+    }
+}
+
+inline
+void render(const Primitive& p, agl::VertexArray va) {
+    auto b = agl::element_array_buffer_binding(va);
+    if(agl::element_array_buffer_binding(va)) {
         agl::draw_elements(
             p.draw_mode,
             p.primitive_count,

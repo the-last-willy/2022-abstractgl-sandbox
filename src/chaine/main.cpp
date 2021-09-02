@@ -42,24 +42,27 @@ struct App : Program {
     Mesh mesh = {};
     std::shared_ptr<eng::Mesh> drawable_mesh = nullptr;
 
-    std::shared_ptr<eng::Material> material = std::make_shared<eng::Material>();
-
     tlw::View view = {};
     eng::PerspectiveProjection projection = {};
+
+    eng::RenderPass render_pass = {};
 
     void init() override {
         shader_compiler.root = local::src_folder;
 
-        load(material->program, shader_compiler, {
-            {
-                agl::vertex_shader_tag,
-                "chaine/shader/solid.vs"
-            },
-            {
-                agl::fragment_shader_tag,
-                "chaine/shader/solid.fs"
-            }
-        });
+        { // Render pass.
+            render_pass.program = std::make_shared<eng::Program>();
+            load(*render_pass.program, shader_compiler, {
+                {
+                    agl::vertex_shader_tag,
+                    "chaine/shader/solid.vs"
+                },
+                {
+                    agl::fragment_shader_tag,
+                    "chaine/shader/solid.fs"
+                }
+            });
+        }
 
         mesh.triangle_indices = { agl::Uvec3{0, 1, 2} };
         mesh.vertex_positions = {
@@ -68,15 +71,19 @@ struct App : Program {
             agl::vec3(0, 1, 1),
         };
 
-        drawable_mesh = solid_mesh(mesh);
-
-        drawable_mesh->primitives[0]->material = material;
+        {
+            drawable_mesh = solid_mesh(mesh);
+            for(auto& p : drawable_mesh->primitives) {
+                p->material = std::make_shared<eng::Material>();
+            }
+            add(render_pass, *drawable_mesh);
+        }
 
         auto f = format::off::read(local::root_folder + "/data/queen.off");
         std::cout << std::endl;
     }
 
-    void update(float dt) override {
+    void update(float) override {
         if(glfwGetMouseButton(window.window, GLFW_MOUSE_BUTTON_1)) {
             glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             agl::Vec2 d = current_cursor_pos - previous_cursor_pos;
@@ -109,15 +116,16 @@ struct App : Program {
     }
 
     void render() override {
-        bind(*material);
-
-        for(auto& primitive : drawable_mesh->primitives | common::views::indirect) {
-            bind(primitive);
-            bind(primitive, *primitive.material);
-            uniform(primitive.material->program, "mvp", transform(projection) * inverse(transform(view)));
-            eng::render(primitive);
+        bind(*render_pass.program);
+        for(std::size_t i = 0; i < size(render_pass.primitives); ++i) {
+            auto& p = *render_pass.primitives[i];
+            auto& va = render_pass.vertex_arrays[i];
+            bind(*p.material, *render_pass.program);
+            bind(va);
+            uniform(*render_pass.program, "mvp", transform(projection) * inverse(transform(view)));
+            eng::render(p, va);
         }
-        unbind(*material);
+        unbind(*render_pass.program);
     }
 };
 

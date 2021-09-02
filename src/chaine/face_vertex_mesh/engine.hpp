@@ -5,7 +5,7 @@
 #include <engine/all.hpp>
 
 inline
-auto solid_mesh(const FaceVertexMesh& m) {
+auto face_mesh(const FaceVertexMesh& m) {
     auto index_accessor = eng::Accessor();
     {
         auto& accessor = index_accessor;

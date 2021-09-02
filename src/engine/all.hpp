@@ -11,6 +11,7 @@
 #include "node.hpp"
 #include "node.hpp"
 #include "omni_shadow_map.hpp"
+#include "render_pass.hpp"
 #include "scene.hpp"
 #include "skin.hpp"
 #include "texture.hpp"
