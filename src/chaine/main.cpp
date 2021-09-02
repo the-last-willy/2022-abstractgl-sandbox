@@ -13,10 +13,11 @@
 
 #include "mesh.hpp"
 
+#include <common/all.hpp>
 #include <local/all.hpp>
 #include "engine/data/all.hpp"
 #include "engine/all.hpp"
-#include "format/gltf2/all.hpp"
+#include "format/off/all.hpp"
 #include "program/all.hpp"
 #include "file.hpp"
 #include "root.hpp"
@@ -69,6 +70,9 @@ struct App : Program {
         drawable_mesh = solid_mesh(mesh);
 
         drawable_mesh->primitives[0]->material = material;
+
+        auto f = format::off::read("C:/Users/Willy/Downloads/queen.off");
+        std::cout << std::endl;
     }
 
     void update(float dt) override {
