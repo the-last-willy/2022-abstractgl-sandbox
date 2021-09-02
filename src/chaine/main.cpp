@@ -42,6 +42,9 @@ struct App : Program {
 
     std::shared_ptr<eng::Material> material = std::make_shared<eng::Material>();
 
+    tlw::View view = {};
+    eng::PerspectiveProjection projection = {};
+
     void init() override {
         shader_compiler.root = local::src_folder;
 
@@ -58,22 +61,55 @@ struct App : Program {
 
         mesh.triangle_indices = { agl::Uvec3{0, 1, 2} };
         mesh.vertex_positions = {
-            agl::vec3(0, 0, 0),
-            agl::vec3(1, 0, 0),
-            agl::vec3(0, 1, 0),
+            agl::vec3(0, 0, 1),
+            agl::vec3(1, 0, 1),
+            agl::vec3(0, 1, 1),
         };
 
         drawable_mesh = solid_mesh(mesh);
+
+        drawable_mesh->primitives[0]->material = material;
     }
 
     void update(float dt) override {
-        
+        if(glfwGetMouseButton(window.window, GLFW_MOUSE_BUTTON_1)) {
+            glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            agl::Vec2 d = current_cursor_pos - previous_cursor_pos;
+            view.yaw += d[0] / 500.f;
+            view.pitch += d[1] / 500.f;
+
+            previous_cursor_pos = current_cursor_pos;
+        } else {
+            glfwSetInputMode(window.window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            previous_cursor_pos = current_cursor_pos;
+        }
+        {
+            if(glfwGetKey(window.window, GLFW_KEY_A)) {
+                auto direction = (rotation(view) * agl::rotation_y(agl::pi / 2.f))[2].xyz();
+                view.position = view.position - direction / 10.f;
+            }
+            if(glfwGetKey(window.window, GLFW_KEY_D)) {
+                auto direction = (rotation(view) * agl::rotation_y(agl::pi / 2.f))[2].xyz();
+                view.position = view.position + direction / 10.f;
+            }
+            if(glfwGetKey(window.window, GLFW_KEY_S)) {
+                auto direction = rotation(view)[2].xyz();
+                view.position = view.position - direction / 10.f;
+            }
+            if(glfwGetKey(window.window, GLFW_KEY_W)) {
+                auto direction = rotation(view)[2].xyz();
+                view.position = view.position + direction / 10.f;
+            }
+        }
     }
 
     void render() override {
         bind(*material);
+
         for(auto& primitive : drawable_mesh->primitives | common::views::indirect) {
-            bind(primitive.vertex_array);
+            bind(primitive);
+            bind(primitive, *primitive.material);
+            uniform(primitive.material->program, "mvp", transform(projection) * inverse(transform(view)));
             eng::render(primitive);
         }
         unbind(*material);

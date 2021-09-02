@@ -75,6 +75,8 @@ auto solid_mesh(const Mesh& m) {
         primitive.attributes["POSITION"] = std::move(position_accessor);
         primitive.draw_type = agl::DrawType::unsigned_int;
         primitive.indices = std::move(index_accessor);
+        primitive.primitive_count = agl::Count<GLsizei>(3 * GLsizei(size(m.triangle_indices)));
+        primitive.vertex_array = agl::vertex_array();
     }
 
     return std::make_shared<eng::Mesh>(eng::Mesh({std::move(primitive_ptr)}));

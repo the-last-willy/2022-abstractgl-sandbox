@@ -75,6 +75,7 @@ void error_callback(
 
         case GL_DEBUG_TYPE_OTHER:
         _type = "OTHER";
+        throwing = false;
         break;
 
         case GL_DEBUG_TYPE_MARKER:
@@ -101,6 +102,7 @@ void error_callback(
 
         case GL_DEBUG_SEVERITY_NOTIFICATION:
         _severity = "NOTIFICATION";
+        throwing = false;
         break;
 
         default:
