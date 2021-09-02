@@ -3,7 +3,7 @@
 #include "Vertex.hpp"
 #include <vector>
 
-struct Mesh {
+struct FaceVertexMesh {
     std::vector<Vertex> vertices = {};
     std::vector<Face> faces = {};
 };

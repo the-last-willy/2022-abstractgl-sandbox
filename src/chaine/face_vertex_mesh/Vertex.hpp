@@ -1,6 +1,6 @@
 #pragma once
 
 struct Vertex {
-    agl::vec3 point;
+    agl::Vec3 point;
     std::size_t index;
 };
