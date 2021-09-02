@@ -36,10 +36,15 @@
 
 using namespace chaine;
 
+struct RenderSettings {
+    bool show_edges = true;
+    bool show_triangles = true;
+    bool show_vertices = true;
+};
+
 struct App : Program {
     eng::ShaderCompiler shader_compiler = {};
 
-    Mesh mesh = {};
     std::shared_ptr<eng::Mesh> drawable_mesh = nullptr;
 
     tlw::View view = {};
@@ -64,15 +69,24 @@ struct App : Program {
             });
         }
 
-        mesh.triangle_indices = { agl::Uvec3{0, 1, 2} };
-        mesh.vertex_positions = {
-            agl::vec3(0, 0, 1),
-            agl::vec3(1, 0, 1),
-            agl::vec3(0, 1, 1),
-        };
+        auto mesh = FaceVertexMesh();
+        {
+            mesh.faces = {
+                {{0, 1, 2}, {0, 0, 0}},
+                {{3, 4, 5}, {0, 0, 0}}
+            };
+            mesh.vertices = {
+                {agl::vec3(0, 0, 1), 0},
+                {agl::vec3(1, 0, 1), 0},
+                {agl::vec3(0, 1, 1), 0},
+                {agl::vec3(0, 2, 1), 0},
+                {agl::vec3(1, 2, 1), 0},
+                {agl::vec3(0, 3, 1), 0}
+            };
+        }
 
         {
-            drawable_mesh = solid_mesh(mesh);
+            drawable_mesh = face_mesh(mesh);
             for(auto& p : drawable_mesh->primitives) {
                 p->material = std::make_shared<eng::Material>();
             }
@@ -81,6 +95,8 @@ struct App : Program {
 
         auto f = format::off::read(local::root_folder + "/data/queen.off");
         std::cout << std::endl;
+
+        projection.aspect_ratio = 16.f / 9.f;
     }
 
     void update(float) override {

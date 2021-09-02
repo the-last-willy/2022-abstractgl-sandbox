@@ -1,6 +1,6 @@
 #pragma once
 
-#include "facevertexmesh.hpp"
+#include "face_vertex_mesh.hpp"
 
 #include <engine/all.hpp>
 
@@ -17,7 +17,7 @@ auto face_mesh(const FaceVertexMesh& m) {
             buffer.opengl = create(agl::buffer_tag);
             storage(
                 buffer.opengl,
-                size(m.vertex_positions) * sizeof(agl::Vec3), 
+                size(m.faces) * sizeof(agl::Uvec3), 
                 GL_MAP_WRITE_BIT);
             auto mapping = map<agl::Uvec3>(buffer.opengl, GL_WRITE_ONLY);
             for(std::size_t i = 0; i < size(m.faces); ++i) {
@@ -48,12 +48,12 @@ auto face_mesh(const FaceVertexMesh& m) {
             buffer.opengl = create(agl::buffer_tag);
             storage(
                 buffer.opengl,
-                size(m.vertex_positions) * sizeof(agl::Vec3), 
+                size(m.vertices) * sizeof(agl::Vec3), 
                 GL_MAP_WRITE_BIT);
             auto mapping = map<agl::Vec3>(buffer.opengl, GL_WRITE_ONLY);
             for(std::size_t i = 0; i < size(m.vertices); ++i) {
                 auto& v = m.vertices[i];
-                mapping[i] = v.poit;
+                mapping[i] = v.point;
             }
             unmap(buffer.opengl);
 
@@ -71,7 +71,7 @@ auto face_mesh(const FaceVertexMesh& m) {
         primitive.attributes["POSITION"] = std::move(position_accessor);
         primitive.draw_type = agl::DrawType::unsigned_int;
         primitive.indices = std::move(index_accessor);
-        primitive.primitive_count = agl::Count<GLsizei>(3 * GLsizei(size(m.triangle_indices)));
+        primitive.primitive_count = agl::Count<GLsizei>(3 * GLsizei(size(m.faces)));
         primitive.vertex_array = agl::vertex_array();
     }
 
