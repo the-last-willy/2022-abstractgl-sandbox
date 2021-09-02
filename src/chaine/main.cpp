@@ -12,6 +12,7 @@
 // Local headers.
 
 #include "mesh.hpp"
+#include "face_vertex_mesh/all.hpp"
 
 #include <local/all.hpp>
 #include "engine/data/all.hpp"
