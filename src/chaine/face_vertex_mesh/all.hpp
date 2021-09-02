@@ -1,5 +1,5 @@
 #pragma once
 
-#include "Face.hpp"
-#include "FaceVertexMesh.hpp"
-#include "Vertex.hpp"
+#include "face.hpp"
+#include "face_vertex_mesh.hpp"
+#include "vertex.hpp"

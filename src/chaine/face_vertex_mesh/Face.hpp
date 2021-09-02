@@ -1,7 +1,7 @@
 #pragma once
-#include <vector>
+#include <array>
 
 struct Face {
-    std::vector<std::size_t> vertices = {};
-    std::vector<std::size_t> adjacents = {};
+    std::array<std::size_t, 3> vertices;
+    std::array<std::size_t, 3> adjacents;
 };
