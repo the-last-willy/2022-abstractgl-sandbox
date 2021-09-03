@@ -20,6 +20,7 @@ struct RenderPass {
 
 inline
 void configure(agl::VertexArray va, const Primitive& pi, const Program& po) {
+    element_buffer(va, pi.indices.buffer->opengl);
     for(int i = 0; i < agl::active_attributes(po.program); ++i) {
         auto aa = agl::active_attrib(po.program, agl::AttributeIndex(i));
         auto ai = attribute_location(po.program, aa.name.c_str());

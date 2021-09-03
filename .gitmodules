@@ -11,3 +11,6 @@
 [submodule "libs/tinygltf/tinygltf"]
 	path = libs/tinygltf/tinygltf
 	url = https://github.com/syoyo/tinygltf.git
+[submodule "libs/range_v3/range_v3"]
+	path = libs/range_v3/range_v3
+	url = https://github.com/ericniebler/range-v3.git
