@@ -15,12 +15,10 @@
 
 #include <common/all.hpp>
 #include <local/all.hpp>
-#include "engine/data/all.hpp"
-#include "engine/all.hpp"
-#include "format/off/all.hpp"
 #include "program/all.hpp"
-#include "file.hpp"
-#include "root.hpp"
+
+#include <agl/all.hpp>
+#include <agl/format/off/all.hpp>
 
 // External libraries.
 
