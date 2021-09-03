@@ -72,6 +72,8 @@ struct App : Program {
         auto off = format::off::read(local::root_folder + "/data/queen.off");
         std::cout << std::endl;
 
+        FaceVertexMesh fvmesh;
+
 
         auto mesh = TriangleMesh();
         {

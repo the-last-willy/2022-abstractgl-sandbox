@@ -4,6 +4,8 @@
 
 #include <agl/engine/all.hpp>
 
+namespace chaine {
+
 inline
 auto face_mesh(const FaceVertexMesh& m) {
     auto index_accessor = eng::Accessor();
@@ -76,4 +78,6 @@ auto face_mesh(const FaceVertexMesh& m) {
     }
 
     return std::make_shared<eng::Mesh>(eng::Mesh({std::move(primitive_ptr)}));
+}
+
 }
