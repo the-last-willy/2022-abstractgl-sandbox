@@ -66,6 +66,10 @@ struct App : Program {
                     "chaine/shader/solid.fs"
                 }
             });
+            render_pass.program->capabilities.push_back({ agl::Capability::cull_face, []() {
+                glCullFace(GL_BACK); }});
+            render_pass.program->capabilities.push_back({ agl::Capability::depth_test, []() {
+                glDepthFunc(GL_LESS); }});
         }
 
         // auto mesh = FaceVertexMesh();
@@ -87,6 +91,7 @@ struct App : Program {
         auto off = format::off::read(local::root_folder + "/data/queen.off");
         std::cout << std::endl;
 
+
         auto mesh = TriangleMesh();
         {
             mesh.triangle_indices = off.triangle_indices;
@@ -94,7 +99,7 @@ struct App : Program {
         }
 
         {
-            drawable_mesh = solid_mesh(mesh);
+            drawable_mesh = vertex_mesh(mesh);
             for(auto& p : drawable_mesh->primitives) {
                 p->material = std::make_shared<eng::Material>();
             }
@@ -121,24 +126,26 @@ struct App : Program {
         {
             if(glfwGetKey(window.window, GLFW_KEY_A)) {
                 auto direction = (rotation(view) * agl::rotation_y(agl::pi / 2.f))[2].xyz();
-                view.position = view.position - direction / 10.f;
+                view.position = view.position - direction / 100.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_D)) {
                 auto direction = (rotation(view) * agl::rotation_y(agl::pi / 2.f))[2].xyz();
-                view.position = view.position + direction / 10.f;
+                view.position = view.position + direction / 100.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_S)) {
                 auto direction = rotation(view)[2].xyz();
-                view.position = view.position - direction / 10.f;
+                view.position = view.position - direction / 100.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_W)) {
                 auto direction = rotation(view)[2].xyz();
-                view.position = view.position + direction / 10.f;
+                view.position = view.position + direction / 100.f;
             }
         }
     }
 
     void render() override {
+        glClearDepthf(1.f);
+        glClear(GL_DEPTH_BUFFER_BIT);
         bind(*render_pass.program);
         for(std::size_t i = 0; i < size(render_pass.primitives); ++i) {
             auto& p = *render_pass.primitives[i];
@@ -146,7 +153,7 @@ struct App : Program {
             bind(*p.material, *render_pass.program);
             bind(va);
             uniform(*render_pass.program, "mvp", transform(projection) * inverse(transform(view)));
-            // eng::render(p, va);
+            eng::render(p, va);
         }
         unbind(*render_pass.program);
     }

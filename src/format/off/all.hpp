@@ -39,7 +39,8 @@ auto read(const std::string& filepath) {
 
     for(std::size_t i = 0; i < face_count; ++i) {
         auto& ti = f.triangle_indices[i];
-        stream >> ti[0] >> ti[1] >> ti[2];
+        GLuint face_vertex_count;
+        stream >> face_vertex_count >> ti[0] >> ti[1] >> ti[2];
     }
 
     return f;
