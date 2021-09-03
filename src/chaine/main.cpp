@@ -11,8 +11,7 @@
 
 // Local headers.
 
-#include "mesh.hpp"
-#include "face_vertex_mesh/all.hpp"
+#include "all.hpp"
 
 #include <common/all.hpp>
 #include <local/all.hpp>
@@ -69,32 +68,40 @@ struct App : Program {
             });
         }
 
-        auto mesh = FaceVertexMesh();
+        // auto mesh = FaceVertexMesh();
+        // {
+        //     mesh.faces = {
+        //         {{0, 1, 2}, {0, 0, 0}},
+        //         {{3, 4, 5}, {0, 0, 0}}
+        //     };
+        //     mesh.vertices = {
+        //         {agl::vec3(0, 0, 1), 0},
+        //         {agl::vec3(1, 0, 1), 0},
+        //         {agl::vec3(0, 1, 1), 0},
+        //         {agl::vec3(0, 2, 1), 0},
+        //         {agl::vec3(1, 2, 1), 0},
+        //         {agl::vec3(0, 3, 1), 0}
+        //     };
+        // }
+
+        auto off = format::off::read(local::root_folder + "/data/queen.off");
+        std::cout << std::endl;
+
+        auto mesh = TriangleMesh();
         {
-            mesh.faces = {
-                {{0, 1, 2}, {0, 0, 0}},
-                {{3, 4, 5}, {0, 0, 0}}
-            };
-            mesh.vertices = {
-                {agl::vec3(0, 0, 1), 0},
-                {agl::vec3(1, 0, 1), 0},
-                {agl::vec3(0, 1, 1), 0},
-                {agl::vec3(0, 2, 1), 0},
-                {agl::vec3(1, 2, 1), 0},
-                {agl::vec3(0, 3, 1), 0}
-            };
+            mesh.triangle_indices = off.triangle_indices;
+            mesh.vertex_positions = off.vertex_positions;
         }
 
         {
-            drawable_mesh = face_mesh(mesh);
+            drawable_mesh = solid_mesh(mesh);
             for(auto& p : drawable_mesh->primitives) {
                 p->material = std::make_shared<eng::Material>();
             }
             add(render_pass, *drawable_mesh);
         }
 
-        auto f = format::off::read(local::root_folder + "/data/queen.off");
-        std::cout << std::endl;
+        
 
         projection.aspect_ratio = 16.f / 9.f;
     }
@@ -139,7 +146,7 @@ struct App : Program {
             bind(*p.material, *render_pass.program);
             bind(va);
             uniform(*render_pass.program, "mvp", transform(projection) * inverse(transform(view)));
-            eng::render(p, va);
+            // eng::render(p, va);
         }
         unbind(*render_pass.program);
     }
