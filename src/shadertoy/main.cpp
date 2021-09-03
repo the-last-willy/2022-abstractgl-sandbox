@@ -45,33 +45,37 @@ struct App : Program {
 
     float time = 0.f;
 
-    void init() override {
-        shader_compiler.root = local::src_folder;
+    bool shader_loaded = false;
 
-        { // Render pass.
-            auto fragment_shader
-            = common::string(local::src_folder + "/shadertoy/shader/shadertoy_prefix.fs")
-            + common::string(local::src_folder + "/shadertoy/shader/blob.glsl")
-            + common::string(local::src_folder + "/shadertoy/shader/shadertoy_suffix.fs");
-
-            load(program, {
-                {
-                    agl::vertex_shader_tag,
-                    common::string(local::src_folder + "/shadertoy/shader/shadertoy.vs")
-                },
-                {
-                    agl::fragment_shader_tag,
-                    fragment_shader
-                }
-            });
+    void load_shader() {
+        try {
+            { // Render pass.
+                shader_compiler.root = local::src_folder;
+                load(program, shader_compiler, {
+                    {
+                        agl::vertex_shader_tag,
+                        "shadertoy/shader/shadertoy.vs"
+                    },
+                    {
+                        agl::fragment_shader_tag,
+                        "shadertoy/shader/blob.glsl"
+                    }
+                });
+            }
+            shader_loaded = true;
+        } catch(...) {
+            shader_loaded = false;
         }
-
-        { // Uniforms.
+        if(shader_loaded) {
             uniform(program, "iResolution", agl::vec3(
                 static_cast<float>(window.width()),
                 static_cast<float>(window.height()),
                 0.f));
         }
+    }
+
+    void init() override {
+        load_shader();
     }
 
     void update(float dt) override {
@@ -106,8 +110,13 @@ struct App : Program {
                 view.position = view.position + direction / 10.f;
             }
         }
+        { // Shader hot reloading.
+            if(glfwGetKey(window.window, GLFW_KEY_R)) {
+                load_shader();
+            }
+        }
 
-        {
+        if(shader_loaded) {
             double xpos, ypos;
             glfwGetCursorPos(window.window, &xpos, &ypos);
             auto pressed = glfwGetMouseButton(window.window, GLFW_MOUSE_BUTTON_1);
@@ -117,17 +126,22 @@ struct App : Program {
                 static_cast<float>(pressed),
                 0.f
             ));
+
+            uniform(program, "view", inverse(transform(view)));
         }
     }
 
     void render() override {
-        bind(empty_vertex_array);
-        bind(program);
-        uniform(program, "iTime", time);
-        draw_arrays(
-            agl::DrawMode::triangles,
-            agl::Offset<GLint>(0),
-            agl::Count<GLsizei>(6));
+        clear(agl::default_framebuffer, agl::color_tag, {0., 0., 0., 1.});
+        if(shader_loaded) {
+            bind(empty_vertex_array);
+            bind(program);
+            uniform(program, "iTime", time);
+            draw_arrays(
+                agl::DrawMode::triangles,
+                agl::Offset<GLint>(0),
+                agl::Count<GLsizei>(6));
+        }   
     }
 };
 

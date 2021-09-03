@@ -1,15 +1,19 @@
+#include "shadertoy/shader/shadertoy_prefix.fs"
+
+#include "shadertoy/shader/sdf/all.glsl"
+
+uniform mat4 view;
+
 // Common
 
 // Hashing function
 // Returns a random number in [-1,1]
-float Hash(float seed)
-{
+float Hash(float seed) {
     return fract(sin(seed) * 43758.5453);
 }
 
 // Cosine direction
-vec3 Cosine(in float seed, in vec3 nor)
-{
+vec3 Cosine(in float seed, in vec3 nor) {
     float u = Hash(78.233 + seed);
     float v = Hash(10.873 + seed);
 
@@ -34,8 +38,7 @@ mat3 rotate_z(float a) {
 // m : Mouse position
 // p : Pixel
 // ro, rd : Ray origin and direction
-void Ray(in vec2 m, in vec2 p, out vec3 ro, out vec3 rd)
-{
+void Ray(in vec2 m, in vec2 p, out vec3 ro, out vec3 rd) {
     float a = 3. * 3.14 * m.x;
     float le = 3.8;
 
@@ -52,29 +55,26 @@ void Ray(in vec2 m, in vec2 p, out vec3 ro, out vec3 rd)
 // Main
 
 const int Steps = 1000;
-const float Epsilon = .05; // Marching epsilon
+const float Epsilon = .03; // Marching epsilon
 const float T = .5;
 
 const float rA = 10.; // Maximum and minimum ray marching or sphere tracing distance from origin
 const float rB = 40.;
 
 // Transforms
-vec3 rotateX(vec3 p, float a)
-{
+vec3 rotateX(vec3 p, float a) {
     float sa = sin(a);
     float ca = cos(a);
     return vec3(p.x, ca * p.y - sa * p.z, sa * p.y + ca * p.z);
 }
 
-vec3 rotateY(vec3 p, float a)
-{
+vec3 rotateY(vec3 p, float a) {
     float sa = sin(a);
     float ca = cos(a);
     return vec3(ca * p.x + sa * p.z, p.y, -sa * p.x + ca * p.z);
 }
 
-vec3 rotateZ(vec3 p, float a)
-{
+vec3 rotateZ(vec3 p, float a) {
     float sa = sin(a);
     float ca = cos(a);
     return vec3(ca * p.x + sa * p.y, -sa * p.x + ca * p.y, p.z);
@@ -83,8 +83,7 @@ vec3 rotateZ(vec3 p, float a)
 // Smooth cubic falloff function
 // x : distance
 // R : radius
-float falloff(float x, float R)
-{
+float falloff(float x, float R) {
     float u = clamp(x / R, 0., 1.);
     float v = (1. - u * u);
     return v * v * v;
@@ -97,8 +96,7 @@ float falloff(float x, float R)
 // c : center of skeleton
 // e : energy associated to skeleton
 // R : radius
-float point(vec3 p, vec3 c, float e, float R)
-{
+float point(vec3 p, vec3 c, float e, float R) {
     return e * falloff(length(p - c), R);
 }
 
@@ -106,36 +104,37 @@ float point(vec3 p, vec3 c, float e, float R)
 
 // Blending
 // a,b : field function of the sub-trees
-float Blend(float a, float b)
-{
+float Blend(float a, float b) {
     return a + b;
 }
 
 // Union
 // a : field function of left sub-tree
 // b : field function of right sub-tree
-float Union(float a, float b)
-{
+float Union(float a, float b) {
     return max(a, b);
 }
 
 // Potential field of the object
 // p : point
-float Object(vec3 p)
-{
+float Object(vec3 p) {
     p.z = -p.z;
-    float v = Blend(point(p, vec3(0., 1., 1.), 1., 4.5),
-                    point(p, vec3(2., 0., -3.), 1., 4.5));
+    // float v = Blend(point(p, vec3(0., 1., 1.), 1., 4.5),
+    //                 point(p, vec3(2., 0., -3.), 1., 4.5));
 
-    v = Blend(v, point(p, vec3(-3., 2., -3.), 1., 4.5));
-    v = Union(v, point(p, vec3(-1., -1., 0.), 1., 4.5));
-    return v - T;
+    // v = Blend(v, point(p, vec3(-3., 2., -3.), 1., 4.5));
+    // v = Union(v, point(p, vec3(-1., -1., 0.), 1., 4.5));
+
+    float v = 0.f;
+    // float v = Union(0.5-point_sdf(-vec3(1.), p), 0.5-point_sdf(vec3(1.), p));
+    v = Union(v, 0.1 - unit_cube_sdf(p / 2.));
+
+    return v;
 }
 
 // Calculate object normal
 // p : point
-vec3 ObjectNormal(in vec3 p)
-{
+vec3 ObjectNormal(in vec3 p) {
     float eps = .0001;
     vec3 n;
     float v = Object(p);
@@ -145,26 +144,33 @@ vec3 ObjectNormal(in vec3 p)
     return normalize(n);
 }
 
+// Calculate object normal
+// p : point
+vec3 ObjectNormal6(in vec3 p) {
+    float e = .0001;
+    float nx = Object(vec3(p.x + e, p.y, p.z)) - Object(vec3(p.x - e, p.y, p.z));
+    float ny = Object(vec3(p.x, p.y + e, p.z)) - Object(vec3(p.x, p.y - e, p.z));
+    float nz = Object(vec3(p.x, p.y, p.z + e)) - Object(vec3(p.x, p.y, p.z - e));
+    return normalize(vec3(nx, ny, nz));
+}
+
 // Trace ray using ray marching
 // o : ray origin
 // u : ray direction
 // h : hit
 // s : Number of steps
-float Trace(vec3 o, vec3 u, float rB, out bool h, out int s)
-{
+float Trace(vec3 o, vec3 u, float rB, out bool h, out int s) {
     h = false;
 
     // Don't start at the origin, instead move a little bit forward
     float t = rA;
 
-    for (int i = 0; i < Steps; i++)
-    {
+    for(int i = 0; i < Steps; i++) {
         s = i;
         vec3 p = o + t * u;
         float v = Object(p);
         // Hit object
-        if (v > 0.)
-        {
+        if(v > 0.) {
             s = i;
             h = true;
             break;
@@ -172,8 +178,7 @@ float Trace(vec3 o, vec3 u, float rB, out bool h, out int s)
         // Move along ray
         t += Epsilon;
         // Escape marched far away
-        if (t > rB)
-        {
+        if(t > rB) {
             break;
         }
     }
@@ -185,8 +190,7 @@ float Trace(vec3 o, vec3 u, float rB, out bool h, out int s)
 // u : ray direction
 // h : hit
 // s : Number of steps
-float SphereTrace(vec3 o, vec3 u, float rB, out bool h, out int s)
-{
+float SphereTrace(vec3 o, vec3 u, float rB, out bool h, out int s) {
     h = false;
 
     // Don't start at the origin, instead move a little bit forward
@@ -219,8 +223,7 @@ float SphereTrace(vec3 o, vec3 u, float rB, out bool h, out int s)
 // p : Point
 // n : Normal
 // a : Number of smaples
-float AmbientOcclusion(vec3 p, vec3 n, int a)
-{
+float AmbientOcclusion(vec3 p, vec3 n, int a) {
     if (a == 0)
     {
         return 1.;
@@ -250,13 +253,11 @@ float AmbientOcclusion(vec3 p, vec3 n, int a)
 }
 
 // Background color
-vec3 background(vec3 rd)
-{
+vec3 background(vec3 rd) {
     return mix(vec3(.652, .451, .995), vec3(.552, .897, .995), rd.z * .5 + .5);
 }
 
-float Light(vec3 p, vec3 n)
-{
+float Light(vec3 p, vec3 n) {
     // point light
     const vec3 lp = vec3(5., 10., 25.);
 
@@ -268,16 +269,14 @@ float Light(vec3 p, vec3 n)
     bool h;
     int s;
     float t = SphereTrace(p + .1 * n, l, 100., h, s);
-    if (!h)
-    {
+    if(!h) {
         return diff;
     }
     return 0.;
 }
 
-float SmoothLight(vec3 p, vec3 n, int a)
-{
-    if (a == 0)
+float SmoothLight(vec3 p, vec3 n, int a) {
+    if(a == 0)
         return 1.;
 
     // point light
@@ -287,19 +286,15 @@ float SmoothLight(vec3 p, vec3 n, int a)
 
     float lo = 0.;
 
-    for (int i = 0; i < a; i++)
-    {
+    for(int i = 0; i < a; i++) {
         vec3 d = Cosine(581.123 * float(i), n);
         d = normalize(l + d * .15);
         int s;
         bool h;
         float t = SphereTrace(p, d, 10., h, s);
-        if (!h)
-        {
+        if(!h) {
             lo += 1.;
-        }
-        else if (t > 100.)
-        {
+        } else if(t > 100.) {
             lo += 1.;
         }
     }
@@ -311,8 +306,7 @@ float SmoothLight(vec3 p, vec3 n, int a)
 // Shading and lighting
 // p : point,
 // n : normal at point
-vec3 Shade(vec3 p, vec3 n)
-{
+vec3 Shade(vec3 p, vec3 n) {
     vec3 c = .25 + .25 * background(n);
     c += .15 * AmbientOcclusion(p + .1 * n, n, 0) * vec3(1., 1., 1.);
     c += .35 * Light(p, n);
@@ -320,8 +314,7 @@ vec3 Shade(vec3 p, vec3 n)
 }
 
 // Shading with number of steps
-vec3 ShadeSteps(int n)
-{
+vec3 ShadeSteps(int n) {
     float t = float(n) / (float(Steps - 1));
     return .5 + mix(vec3(.05, .05, .5), vec3(.65, .39, .65), t);
 }
@@ -329,8 +322,7 @@ vec3 ShadeSteps(int n)
 // Picture in picture
 // pixel : Pixel
 // pip : Boolean, true if pixel was in sub-picture zone
-vec2 Pip(in vec2 pixel, out bool pip)
-{
+vec2 Pip(in vec2 pixel, out bool pip) {
     // Pixel coordinates
     vec2 p = (-iResolution.xy + 2. * pixel) / iResolution.y;
     if (pip == true)
@@ -351,8 +343,7 @@ vec2 Pip(in vec2 pixel, out bool pip)
 }
 
 // Image
-void mainImage(out vec4 color, in vec2 pxy)
-{
+void mainImage(out vec4 color, in vec2 pxy) {
     // Picture in picture on
     bool pip = true;
 
@@ -397,3 +388,5 @@ void mainImage(out vec4 color, in vec2 pxy)
 
     color = vec4(rgb, 1.);
 }
+
+#include "shadertoy/shader/shadertoy_suffix.fs"
