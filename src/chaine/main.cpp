@@ -13,7 +13,6 @@
 
 #include "all.hpp"
 
-#include <common/all.hpp>
 #include <local/all.hpp>
 #include "program/all.hpp"
 
