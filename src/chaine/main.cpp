@@ -72,22 +72,6 @@ struct App : Program {
                 glDepthFunc(GL_LESS); }});
         }
 
-        // auto mesh = FaceVertexMesh();
-        // {
-        //     mesh.faces = {
-        //         {{0, 1, 2}, {0, 0, 0}},
-        //         {{3, 4, 5}, {0, 0, 0}}
-        //     };
-        //     mesh.vertices = {
-        //         {agl::vec3(0, 0, 1), 0},
-        //         {agl::vec3(1, 0, 1), 0},
-        //         {agl::vec3(0, 1, 1), 0},
-        //         {agl::vec3(0, 2, 1), 0},
-        //         {agl::vec3(1, 2, 1), 0},
-        //         {agl::vec3(0, 3, 1), 0}
-        //     };
-        // }
-
         auto off = format::off::read(local::root_folder + "/data/queen.off");
         std::cout << std::endl;
 
@@ -105,8 +89,6 @@ struct App : Program {
             }
             add(render_pass, *drawable_mesh);
         }
-
-        
 
         projection.aspect_ratio = 16.f / 9.f;
     }
