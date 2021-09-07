@@ -1,10 +1,7 @@
 #pragma once
 
-<<<<<<< HEAD
 #include "agl/engine/all.hpp"
-=======
 #include "agl/engine/texture.hpp"
->>>>>>> 89a92eccf06d4d9f62d983c3ccf54dd4f75c66fd
 
 #include <agl/all.hpp>
 

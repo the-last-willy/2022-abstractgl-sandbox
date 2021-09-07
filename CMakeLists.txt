@@ -5,6 +5,7 @@ add_subdirectory(libs/abstractgl)
 add_subdirectory(libs/dear_imgui)
 add_subdirectory(libs/glad)
 add_subdirectory(libs/glfw3)
+add_subdirectory(libs/range_v3)
 add_subdirectory(libs/tinygltf)
 
 if(MSVC)
@@ -28,6 +29,7 @@ INTERFACE
     dear_imgui
     glad
     glfw
+    range-v3
     tinygltf
 )
 
