@@ -13,11 +13,8 @@
 
 #include <local/all.hpp>
 #include "engine/data/all.hpp"
-#include "engine/all.hpp"
-#include "format/gltf2/all.hpp"
+#include "agl/format/gltf2/all.hpp"
 #include "program/all.hpp"
-#include "file.hpp"
-#include "root.hpp"
 
 // External libraries.
 
@@ -55,36 +52,8 @@ void load_model(GltfProgram& program, const std::string& filepath);
 
 struct GltfProgram : Program {
     std::vector<std::string> files = {
-        "D:/data/sample/gltf2/sponza/Sponza/glTF/Sponza.gltf",
-        "D:/data/sample/gltf2/virtual_city/VC/glTF/VC.gltf",
-        "D:/data/sample/gltf2/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
-        "D:/data/sample/gltf2/CesiumMilkTruck/glTF/CesiumMilkTruck.gltf",
-        
-        "D:/data/sample/gltf2/damaged_helmet/DamagedHelmet/glTF/DamagedHelmet.gltf",
-
-        "D:/data/sample/gltf2/AnimatedTriangle/glTF/AnimatedTriangle.gltf",
-        "D:/data/sample/gltf2/BoxAnimated/glTF/BoxAnimated.gltf",
-        "D:/data/sample/gltf2/MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf",
-        
-        "D:/data/sample/gltf2/OrientationTest/glTF/OrientationTest.gltf",
-        "D:/data/sample/gltf2/boom_box_with_axes/BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf",
-        "D:/data/sample/gltf2/Buggy/glTF/Buggy.gltf",
-        "D:/data/sample/gltf2/ReciprocatingSaw/glTF/ReciprocatingSaw.gltf",
-
-        "D:/data/sample/gltf2/AlphaBlendModeTest/glTF/AlphaBlendModeTest.gltf",
-        "D:/data/sample/gltf2/VertexColorTest/glTF/VertexColorTest.gltf",
-        "D:/data/sample/gltf2/TextureSettingsTest/glTF/TextureSettingsTest.gltf",
-
-        "D:/data/sample/gltf2/RiggedSimple/glTF/RiggedSimple.gltf",
-        "D:/data/sample/gltf2/Fox/glTF/Fox.gltf",
-        "D:/data/sample/gltf2/BrainStem/glTF/BrainStem.gltf",
-
-        "D:/data/sample/gltf2/SimpleSkin/glTF/SimpleSkin.gltf",
-        "D:/data/sample/gltf2/CesiumMan/glTF/CesiumMan.gltf",
-        "D:/data/sample/gltf2/RiggedFigure/glTF/RiggedFigure.gltf",
-
-        "D:/data/sample/gltf2/InterpolationTest/glTF/InterpolationTest.gltf",
-        "D:/data/sample/gltf2/WaterBottle/glTF/WaterBottle.gltf"
+        "C:/Users/Willy/Desktop/data/sample/gltf2/CesiumMan/glTF/CesiumMan.gltf",
+        "C:/Users/Willy/Desktop/data/sample/gltf2/Sponza/glTF/Sponza.gltf"
     };
 
     eng::ShaderCompiler shader_compiler = {};
@@ -197,7 +166,7 @@ struct GltfProgram : Program {
             }
         }
 
-        load_model(*this, "D:/data/sample/gltf2/BoxAnimated/glTF/BoxAnimated.gltf");
+        load_model(*this, files[0]);
 
         g_buffer = eng::gbuffer(window.width(), window.height());
         { // Depth texture.
@@ -538,7 +507,7 @@ struct GltfProgram : Program {
             unbind(shadow_map_mat);
         }
 
-        if constexpr(true) { // Cube shadow mapping.
+        if constexpr(false) { // Cube shadow mapping.
             bind(omni_shadow_map);
             for(int face_i = 0; face_i < 6; ++face_i) {
                 texture(
@@ -687,7 +656,7 @@ struct GltfProgram : Program {
                 unbind(dir_light_mat);
             }
 
-            if constexpr(true) { // Point lights.
+            if constexpr(false) { // Point lights.
                 bind(point_light_mat);
 
                 auto light_position = v * vec4(point_light.position, 1.f);

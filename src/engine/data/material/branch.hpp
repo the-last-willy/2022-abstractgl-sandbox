@@ -25,11 +25,11 @@ auto make_branch_material() {
         auto shaders = std::map<agl::ShaderType, std::string>{
             {
                 agl::vertex_shader_tag,
-                file(root + "src/shader/tree/phong.vs")
+                agl::standard::string(root + "shader/tree/phong.vs")
             },
             {
                 agl::fragment_shader_tag,
-                file(root + "src/shader/tree/phong.fs")
+                agl::standard::string(root + "shader/tree/phong.fs")
             },
         };
         for(auto& [type, src] : shaders) {

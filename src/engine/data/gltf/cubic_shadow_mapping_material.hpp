@@ -10,11 +10,11 @@ auto cubic_shadow_mapping_material() {
     load(m.program, {
         {
             agl::vertex_shader_tag,
-            file(tlw::root + "src/shader/gltf/cube_face_depth.vs")
+            agl::standard::string(local::src_folder + "shader/gltf/cube_face_depth.vs")
         },
         {
             agl::fragment_shader_tag,
-            file(tlw::root + "src/shader/gltf/cube_face_depth.fs")
+            agl::standard::string(local::src_folder + "shader/gltf/cube_face_depth.fs")
         }});
     m.program.capabilities.emplace_back(
         agl::Capability::cull_face, []() {

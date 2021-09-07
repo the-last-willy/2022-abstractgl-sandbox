@@ -116,7 +116,7 @@ void error_callback(
     << " severity, raised from " << _source
     << ": " << msg << std::endl;
 
-    if(throwing) {
-        throw std::exception();
-    }
+    // if(throwing) {
+    //     throw std::exception();
+    // }
 }

@@ -10,11 +10,11 @@ auto directional_lighting_material() {
     load(m.program, {
         {
             agl::vertex_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/directional_lighting.vs")
+            agl::standard::string(local::src_folder + "shader/gltf/deferred/directional_lighting.vs")
         },
         {
             agl::fragment_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/directional_lighting.fs")
+            agl::standard::string(local::src_folder + "shader/gltf/deferred/directional_lighting.fs")
         }});
     m.program.capabilities.emplace_back(
         agl::Capability::blend, []() {

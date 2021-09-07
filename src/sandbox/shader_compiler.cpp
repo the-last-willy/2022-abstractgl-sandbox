@@ -7,7 +7,7 @@
 
 void throwing_main() {
     auto sc = eng::ShaderCompiler();
-    sc.root = tlw::root + "src/shader/";
+    sc.root = local::src_folder + "src/shader/";
 
     std::cout << sc("gltf/skybox.fs", agl::fragment_shader_tag) << std::endl;
 }

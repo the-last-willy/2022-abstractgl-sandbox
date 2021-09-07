@@ -22,11 +22,11 @@ auto make_leaf_material() {
         auto shaders = std::map<agl::ShaderType, std::string>{
             {
                 agl::vertex_shader_tag,
-                file(root + "src/shader/tree/leaf.vs")
+                agl::standard::string(root + "shader/tree/leaf.vs")
             },
             {
                 agl::fragment_shader_tag,
-                file(root + "src/shader/tree/leaf.fs")
+                agl::standard::string(root + "shader/tree/leaf.fs")
             },
         };
         for(auto& [type, src] : shaders) {

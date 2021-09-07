@@ -10,12 +10,12 @@ auto g_buffer_material() {
     load(m.program, {
         {
             agl::vertex_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/g_buffer.vs"
+            agl::standard::string(local::src_folder + "shader/gltf/deferred/g_buffer.vs"
             )
         },
         {
             agl::fragment_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/g_buffer.fs"
+            agl::standard::string(local::src_folder + "shader/gltf/deferred/g_buffer.fs"
             )
         }});
     m.program.capabilities.emplace_back(

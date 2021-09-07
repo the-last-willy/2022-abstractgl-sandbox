@@ -33,14 +33,8 @@ INTERFACE
 
 # Executables.
 
-add_executable(chaine src/chaine/main.cpp)
-target_link_libraries(chaine PRIVATE common)
-
 add_executable(dear_imgui_demo src/sandbox/dear_imgui.cpp)
 target_link_libraries(dear_imgui_demo PRIVATE common)
-
-add_executable(shadertoy src/shadertoy/main.cpp)
-target_link_libraries(shadertoy PRIVATE common)
 
 add_executable(gltf src/sandbox/gltf.cpp)
 target_link_libraries(gltf PRIVATE common)

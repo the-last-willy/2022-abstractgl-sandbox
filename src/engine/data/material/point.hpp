@@ -25,11 +25,11 @@ auto make_point_material() {
         auto shaders = std::map<agl::ShaderType, std::string>{
             {
                 agl::vertex_shader_tag,
-                file(root + "src/shader/rock/point.vs")
+                agl::standard::string(root + "shader/rock/point.vs")
             },
             {
                 agl::fragment_shader_tag,
-                file(root + "src/shader/rock/point.fs")
+                agl::standard::string(root + "shader/rock/point.fs")
             },
         };
         for(auto& [type, src] : shaders) {

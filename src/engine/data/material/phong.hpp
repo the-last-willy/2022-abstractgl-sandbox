@@ -25,11 +25,11 @@ auto make_monochrome_phong_material() {
         auto shaders = std::map<agl::ShaderType, std::string>{
             {
                 agl::vertex_shader_tag,
-                file(root + "src/shader/rock/phong_monochrome.vs")
+                agl::standard::string(root + "shader/rock/phong_monochrome.vs")
             },
             {
                 agl::fragment_shader_tag,
-                file(root + "src/shader/rock/phong_monochrome.fs")
+                agl::standard::string(root + "shader/rock/phong_monochrome.fs")
             },
         };
         for(auto& [type, src] : shaders) {

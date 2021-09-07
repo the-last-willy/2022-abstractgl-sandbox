@@ -10,11 +10,11 @@ auto tone_mapping_material() {
     load(m.program, {
         {
             agl::vertex_shader_tag,
-            file(tlw::root + "src/shader/gltf/tone_mapping.vs")
+            agl::standard::string(local::src_folder + "shader/gltf/tone_mapping.vs")
         },
         {
             agl::fragment_shader_tag,
-            file(tlw::root + "src/shader/gltf/tone_mapping.fs")
+            agl::standard::string(local::src_folder + "shader/gltf/tone_mapping.fs")
         }});
     return m;
 }

@@ -10,11 +10,11 @@ auto ambient_lighting_material() {
     load(m.program, {
         {
             agl::vertex_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/ambient.vs")
+            agl::standard::string(local::src_folder + "shader/gltf/deferred/ambient.vs")
         },
         {
             agl::fragment_shader_tag,
-            file(tlw::root + "src/shader/gltf/deferred/ambient.fs")
+            agl::standard::string(local::src_folder + "shader/gltf/deferred/ambient.fs")
         }});
     return m;
 }

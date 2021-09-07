@@ -10,11 +10,11 @@ auto skybox_material() {
     load(m.program, {
         {
             agl::vertex_shader_tag,
-            file(tlw::root + "src/shader/gltf/skybox.vs")
+            agl::standard::string(local::src_folder + "shader/gltf/skybox.vs")
         },
         {
             agl::fragment_shader_tag,
-            file(tlw::root + "src/shader/gltf/skybox.fs")
+            agl::standard::string(local::src_folder + "shader/gltf/skybox.fs")
         }});
     m.program.capabilities.emplace_back(
         agl::Capability::texture_cube_map_seamless);

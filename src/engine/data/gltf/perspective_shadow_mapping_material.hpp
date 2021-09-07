@@ -10,11 +10,11 @@ auto perspective_shadow_mapping_material() {
     load(m.program, {
         {
             agl::vertex_shader_tag, 
-            file(tlw::root + "src/shader/gltf/perspective_shadow_map.vs")
+            agl::standard::string(local::src_folder + "shader/gltf/perspective_shadow_map.vs")
         },
         {
             agl::fragment_shader_tag, 
-            file(tlw::root + "src/shader/gltf/perspective_shadow_map.fs")
+            agl::standard::string(local::src_folder + "shader/gltf/perspective_shadow_map.fs")
         }});
     m.program.capabilities.emplace_back(
         agl::Capability::cull_face, []() {
