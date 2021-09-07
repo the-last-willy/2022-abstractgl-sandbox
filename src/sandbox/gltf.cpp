@@ -131,6 +131,8 @@ struct GltfProgram : Program {
 
     // Settings.
     bool skinning_enabled = true;
+
+    eng::RenderPass geometry_pass;
     
     void init() override {
         { // Shader compiler.
@@ -167,6 +169,13 @@ struct GltfProgram : Program {
         }
 
         load_model(*this, files[0]);
+
+        { // Geometry pass.
+            geometry_pass.program = std::make_shared<eng::Program>(gltf::g_buffer_material().program);
+            for(auto& m : scene.meshes | std::views::values | common::views::indirect) {
+                add(geometry_pass, m);
+            }
+        }
 
         g_buffer = eng::gbuffer(window.width(), window.height());
         { // Depth texture.
@@ -249,7 +258,7 @@ struct GltfProgram : Program {
             }
             for(auto& [name, texture_ptr] : g_buffer.color_attachments) {
                 pbr_lighting_mat.textures[name] = texture_ptr;
-             }
+            }
         }
 
         { // HDR.
@@ -540,6 +549,16 @@ struct GltfProgram : Program {
 
         auto vp = transform(*active_camera) * v;
 
+        { // Geometry pass.
+            glViewport(0, 0, window.width(), window.height());
+            bind(g_buffer);
+            clear(g_buffer.opengl, agl::depth_tag, 1.f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            bind(geometry_pass);
+            
+            unbind(geometry_pass);
+        }
         { // G buffer.
             glViewport(0, 0, window.width(), window.height());
             bind(g_buffer);
