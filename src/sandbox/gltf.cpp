@@ -11,6 +11,7 @@
 
 // Local headers.
 
+#include <agl/standard/all.hpp>
 #include <local/all.hpp>
 #include "engine/data/all.hpp"
 #include "agl/format/gltf2/all.hpp"
@@ -20,6 +21,9 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+#include <range/v3/view/indirect.hpp>
+#include <range/v3/view/map.hpp>
 
 // Standard library.
 
@@ -52,8 +56,7 @@ void load_model(GltfProgram& program, const std::string& filepath);
 
 struct GltfProgram : Program {
     std::vector<std::string> files = {
-        "C:/Users/Willy/Desktop/data/sample/gltf2/CesiumMan/glTF/CesiumMan.gltf",
-        "C:/Users/Willy/Desktop/data/sample/gltf2/Sponza/glTF/Sponza.gltf"
+        "D:/data/sample/gltf2/CesiumMan/glTF/CesiumMan.gltf",
     };
 
     eng::ShaderCompiler shader_compiler = {};
@@ -172,7 +175,7 @@ struct GltfProgram : Program {
 
         { // Geometry pass.
             geometry_pass.program = std::make_shared<eng::Program>(gltf::g_buffer_material().program);
-            for(auto& m : scene.meshes | std::views::values | common::views::indirect) {
+            for(auto& m : scene.meshes | ranges::views::values | ranges::views::indirect) {
                 add(geometry_pass, m);
             }
         }
@@ -297,7 +300,7 @@ struct GltfProgram : Program {
                     c.transform = transform;
                 });
             };
-            for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+            for(auto& n : begin(scene.scenes)->second->nodes | ranges::views::indirect) {
                 traverse_scene(n);
             }
         }
@@ -376,7 +379,7 @@ struct GltfProgram : Program {
             for(std::size_t i = 0; i < size(animation_player.animation->channels); ++i) {
                 auto& channel = *animation_player.animation->channels[i];
                 auto interp_info = animation_player.index(i);
-                auto& transform = common::find_or_insert(
+                auto& transform = agl::standard::find_or_insert(
                     node_animations,
                     channel.target_node.get(),
                     channel.target_node->transform);
@@ -458,7 +461,7 @@ struct GltfProgram : Program {
                     * at<agl::Mat4>(skin.inverse_bind_matrices, i);
                 }
             }
-            for(auto& primitive : (**n.mesh).primitives | common::views::indirect) {
+            for(auto& primitive : (**n.mesh).primitives | ranges::views::indirect) {
                 f(primitive, transform, joint_matrices);
             }
         }
@@ -482,7 +485,7 @@ struct GltfProgram : Program {
             clear(shadow_map_fb);
 
             bind(shadow_map_mat);
-            for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+            for(auto& n : begin(scene.scenes)->second->nodes | ranges::views::indirect) {
                 traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform, const std::vector<agl::Mat4>&) {
                     bind(primitive);
                     auto mvp = dir_light.transform * transform;
@@ -504,7 +507,7 @@ struct GltfProgram : Program {
             clear(shadow_map_fb);
 
             bind(shadow_map_mat);
-            for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+            for(auto& n : begin(scene.scenes)->second->nodes | ranges::views::indirect) {
                 traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform, const std::vector<agl::Mat4>&) {
                     bind(primitive.vertex_array);
                     auto mvp = spot_light.transform * transform;
@@ -531,7 +534,7 @@ struct GltfProgram : Program {
                 * inverse(transform(omni_shadow_map.views[face_i]))
                 * inverse(agl::translation(point_light.position));
 
-                for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+                for(auto& n : begin(scene.scenes)->second->nodes | ranges::views::indirect) {
                     traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform, const std::vector<agl::Mat4>&) {
                         bind(primitive.vertex_array);
                         auto mvp = vp * transform;
@@ -565,7 +568,7 @@ struct GltfProgram : Program {
             clear(g_buffer.opengl, agl::depth_tag, 1.f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-            for(auto& n : begin(scene.scenes)->second->nodes | common::views::indirect) {
+            for(auto& n : begin(scene.scenes)->second->nodes | ranges::views::indirect) {
                 traverse_scene(n, [&](eng::Primitive& primitive, const agl::Mat4& transform, const std::vector<agl::Mat4>& joint_transforms) {
                     if(primitive.material) {
                         auto& m = *primitive.material;
@@ -787,7 +790,7 @@ void load_model(GltfProgram& program, const std::string& filepath) {
     program.scene = format::gltf2::fill(model);
 
     { // Normalizing cameras.
-        for(auto& c : program.scene.cameras | std::views::values | common::views::indirect) {
+        for(auto& c : program.scene.cameras | ranges::views::values | ranges::views::indirect) {
             if(auto pp = std::get_if<eng::PerspectiveProjection>(&c.projection)) {
                 pp->aspect_ratio = 16.f / 9.f;
             }
@@ -795,8 +798,8 @@ void load_model(GltfProgram& program, const std::string& filepath) {
     }
 
     { // Normalizing materials.
-        for(auto& mesh : program.scene.meshes | std::views::values | common::views::indirect)
-        for(auto& primitive : mesh.primitives | common::views::indirect) {
+        for(auto& mesh : program.scene.meshes | ranges::views::values | ranges::views::indirect)
+        for(auto& primitive : mesh.primitives | ranges::views::indirect) {
             if(!primitive.material) {
                 primitive.material = std::make_shared<eng::Material>();
             }
@@ -804,7 +807,7 @@ void load_model(GltfProgram& program, const std::string& filepath) {
             auto& m = *primitive.material;
 
 
-            for(auto& t : m.textures | std::views::values | common::views::indirect) {
+            for(auto& t : m.textures | ranges::views::values | ranges::views::indirect) {
                 if(!t.sampler) {
                     t.sampler = program.default_sampler;
                 }
@@ -829,8 +832,8 @@ void load_model(GltfProgram& program, const std::string& filepath) {
     }
 
     { // Vertex attribute plumbing.
-        for(auto& mesh : program.scene.meshes | std::views::values | common::views::indirect)
-        for(auto& primitive : mesh.primitives | common::views::indirect) {
+        for(auto& mesh : program.scene.meshes | ranges::views::values | ranges::views::indirect)
+        for(auto& primitive : mesh.primitives | ranges::views::indirect) {
             bind(primitive, *primitive.material);
         }
     }
