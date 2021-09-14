@@ -56,27 +56,16 @@ void load_model(GltfProgram& program, const std::string& filepath);
 
 struct GltfProgram : Program {
     std::vector<std::string> files = {
-        "C:/Users/Willy/Desktop/data/sample/gltf2/Box/glTF/Box.gltf",
+        "D:/data/sample/gltf2/box/Box/glTF/Box.gltf",
     };
 
     eng::ShaderCompiler shader_compiler = {};
-
-    std::shared_ptr<eng::Primitive> fullscreen_prim = std::make_shared<eng::Primitive>();
 
     // glTF file.
     format::gltf2::Content scene = {};
 
     // Default sampler.
     agl::Sampler default_sampler;
-
-    // Default material.
-    std::shared_ptr<eng::Material> default_material = std::make_shared<eng::Material>();
-
-    // Default textures.
-    std::shared_ptr<eng::Texture> default_albedo_tex = std::make_shared<eng::Texture>();
-    std::shared_ptr<eng::Texture> default_emissive_tex = std::make_shared<eng::Texture>();
-    std::shared_ptr<eng::Texture> default_normal_map_tex = std::make_shared<eng::Texture>();
-    std::shared_ptr<eng::Texture> default_occlusion_tex = std::make_shared<eng::Texture>();
 
     // Ambient lighting.
     eng::Material ambient_light_mat = {};
@@ -88,40 +77,11 @@ struct GltfProgram : Program {
     tlw::PerspectiveProjection projection = {};
     tlw::View view = {};
 
-    eng::RenderPass ambient_light_pass;
+    agl::engine::RenderPass ambient_light_pass;
     
     void init() override {
         { // Shader compiler.
             shader_compiler.root = local::shader_folder;
-        }
-        { // Fullscreen primitive.
-            auto& p = *fullscreen_prim;
-            p.vertex_array = agl::vertex_array();
-            p.primitive_count = agl::Count<GLsizei>(6);
-        }
-        { // Default sampler.
-            default_sampler = create(agl::sampler_tag);
-            mag_filter(default_sampler, GL_LINEAR);
-            min_filter(default_sampler, GL_LINEAR);
-        }
-        { // Default textures.
-            *default_material = gltf::g_buffer_material();
-            { // Albedo.
-                auto& t = *default_albedo_tex = eng::default_albedo_texture(agl::vec3(1.f));
-                t.sampler = default_sampler;
-            }
-            { // Emissive map.
-                auto& t = *default_emissive_tex = eng::default_emissive_texture(agl::vec3(0.f));
-                t.sampler = default_sampler;
-            }
-            { // Normal map.
-                auto& t = *default_normal_map_tex = eng::default_normal_texture(agl::vec3(0.f, 0.f, 1.f));
-                t.sampler = default_sampler;
-            }
-            { // Occlusion map.
-                auto& t = *default_occlusion_tex = eng::default_occlusion_texture(1.f);
-                t.sampler = default_sampler;
-            }
         }
 
         { // Ambient light pass.
@@ -141,20 +101,12 @@ struct GltfProgram : Program {
                 glDepthFunc(GL_LESS); });
         }
         load_model(*this, files[0]);
-        
-        // { // Changes primitives linked program.
-        //     for(auto& m : scene.meshes | ranges::views::values | ranges::views::indirect)
-        //     for(auto& p : m.primitives | ranges::views::indirect) {
-        //         p.material->program = *ambient_light_pass.program;
-        //         eng::bind(p, *p.material);
-        //     }
-        // }
 
-        // { // Add meshes to ambient lighting pass.
-        //     for(auto& m : scene.meshes | ranges::views::values | ranges::views::indirect) {
-        //         add(ambient_light_pass, m);
-        //     }
-        // }
+        {
+            for(auto& m : scene.meshes | ranges::views::values) {
+                subscribe(ambient_light_pass, m);
+            }
+        }
 
         { // Camera.
             // SCENE CAMERA DISABLED>
@@ -183,11 +135,11 @@ struct GltfProgram : Program {
         }
         {
             if(glfwGetKey(window.window, GLFW_KEY_A)) {
-                auto direction = (rotation(view) * agl::rotation_y(agl::pi / 2.f))[2].xyz();
+                auto direction = (rotation(view) * agl::rotation_y(agl::constant::pi / 2.f))[2].xyz();
                 view.position = view.position - direction / 10.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_D)) {
-                auto direction = (rotation(view) * agl::rotation_y(agl::pi / 2.f))[2].xyz();
+                auto direction = (rotation(view) * agl::rotation_y(agl::constant::pi / 2.f))[2].xyz();
                 view.position = view.position + direction / 10.f;
             }
             if(glfwGetKey(window.window, GLFW_KEY_S)) {
@@ -209,30 +161,8 @@ struct GltfProgram : Program {
         auto vp = transform(*active_camera) * v;
 
         { // Ambient light pass.
-            for(auto& m : scene.meshes | ranges::views::values | ranges::views::indirect)
-            for(auto& p : m.primitives | ranges::views::indirect) {
-                    bind(p);
-                    uniform(p.material->program, "mvp_transform", vp);
-                    // auto normal_transform = transpose(inverse(mv));
-                    // uniform(p.material->program.program, "normal_transform", normal_transform);
-                    eng::render(p);
-                    unbind(p);
-            }
-        }
-
-        if(ImGui::BeginMainMenuBar()) {
-            if(ImGui::BeginMenu("File")) {
-                if(ImGui::BeginMenu("Open")) {
-                    for(auto& f : files) {
-                        if(ImGui::MenuItem(f.c_str())) {
-                            load_model(*this, f);
-                        }
-                    }
-                    ImGui::EndMenu();
-                }
-                ImGui::EndMenu();
-            }
-            ImGui::EndMainMenuBar();
+            ambient_light_pass.uniforms["mvp_transform"] = std::make_shared<eng::Uniform<agl::Mat4>>(vp);
+            agl::engine::render(ambient_light_pass);
         }
     }
 };
@@ -281,13 +211,6 @@ void load_model(GltfProgram& program, const std::string& filepath) {
             }
 
             auto& m = *primitive.material;
-
-
-            for(auto& t : m.textures | ranges::views::values | ranges::views::indirect) {
-                if(!t.sampler) {
-                    t.sampler = program.default_sampler;
-                }
-            }
 
             m.program.program = program.ambient_light_pass.program->program;
         }

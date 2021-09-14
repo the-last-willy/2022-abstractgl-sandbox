@@ -1,6 +1,6 @@
-#version 450 core
+#version 450
 
-in vec3 vertex_color;
+layout(location = 0) in vec3 vertex_color;
 
 out vec3 fragment_color;
 
