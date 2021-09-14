@@ -103,6 +103,7 @@ void error_callback(
         case GL_DEBUG_SEVERITY_NOTIFICATION:
         _severity = "NOTIFICATION";
         throwing = false;
+        return;
         break;
 
         default:
