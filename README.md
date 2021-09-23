@@ -1,4 +1,4 @@
-I use this project to play around with the [AbstractGL]() library.
+I use this project to play around with the [AbstractGL](https://github.com/the-last-willy/abstractgl) library.
 
 So, there is nothing much to see around here beside a mess.
 
