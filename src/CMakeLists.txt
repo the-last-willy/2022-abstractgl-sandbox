@@ -12,7 +12,8 @@ conan_basic_setup()
 ################################################################################
 # Packages.
 
-find_package(api_opengl REQUIRED)
+find_package(abstractgl REQUIRED abstractgl)
+find_package(api_opengl REQUIRED api_opengl)
 find_package(tinyobjloader REQUIRED)
 
 ################################################################################
@@ -52,7 +53,7 @@ add_library(all_libraries INTERFACE)
 target_link_libraries(all_libraries
     INTERFACE
         ${CONAN_LIBS}
-
+        abstractgl::abstractgl
         abstractgl::api_opengl
         tinyobjloader::tinyobjloader
         glad
