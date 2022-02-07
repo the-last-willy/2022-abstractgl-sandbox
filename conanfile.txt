@@ -1,10 +1,22 @@
 [requires]
+glew/2.2.0
 glfw/3.3.6
 glm/0.9.9.8
 imgui/1.86
+ms-gsl/4.0.0
 range-v3/0.11.0
 stb/20200203
 tinygltf/2.5.0
 
 [generators]
-cmake
+cmake_find_package_multi
+
+[options]
+glew:shared=False
+
+[imports]
+./res/bindings, imgui_impl_glfw.cpp -> ../ext/imgui/imgui
+./res/bindings, imgui_impl_glfw.h -> ../ext/imgui/imgui
+./res/bindings, imgui_impl_opengl3.cpp -> ../ext/imgui/imgui
+./res/bindings, imgui_impl_opengl3.h -> ../ext/imgui/imgui
+./res/bindings, imgui_impl_opengl3_loader.h -> ../ext/imgui/imgui
