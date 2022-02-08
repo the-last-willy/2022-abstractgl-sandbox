@@ -3,6 +3,7 @@
 #include "common/dependency/abstractgl_api_opengl.hpp"
 #include "common/dependency/glm.hpp"
 #include "common/opengl/debug_message_callback.hpp"
+#include "common/all.hpp"
 
 #include <agl/standard/all.hpp>
 
@@ -14,6 +15,9 @@ struct HelloTriangle {
     gl::OptUniformLoc object_to_clip_location;
 
     gl::VertexArray vertex_array;
+
+    gizmo::SolidBox solid_box;
+    gl::VertexArray solid_box_vao;
 
     // Camera.
     glm::mat4 view_to_clip = glm::mat4(1.f);
@@ -68,40 +72,40 @@ void init(HelloTriangle& _this) {
                 glm::vec3(+0.5f, +0.5f, 0.f)
             },
             GL_NONE);
-        { // Color attribute.
-            auto attribindex = gl::GetAttribLocation(_this.shader_program, "a_color");
-            auto bindingindex = GLuint(0);
-            gl::VertexArrayAttribFormat(_this.vertex_array,
-                attribindex,
-                3, GL_FLOAT,
-                GL_FALSE, 0);
-            gl::VertexArrayVertexBuffer(_this.vertex_array,
-                bindingindex,
-                _this.color_buffer,
-                0, sizeof(glm::vec3));
-            gl::VertexArrayAttribBinding(_this.vertex_array,
-                attribindex,
-                bindingindex);
-            gl::EnableVertexArrayAttrib(_this.vertex_array,
-                attribindex);
-        }
-        { // Position attribute.
-            auto attribindex = gl::GetAttribLocation(_this.shader_program, "a_position");
-            auto bindingindex = GLuint(1);
-            gl::VertexArrayAttribFormat(_this.vertex_array,
-                attribindex,
-                3, GL_FLOAT,
-                GL_FALSE, 0);
-            gl::VertexArrayVertexBuffer(_this.vertex_array,
-                bindingindex,
-                _this.position_buffer,
-                0, sizeof(glm::vec3));
-            gl::VertexArrayAttribBinding(_this.vertex_array,
-                attribindex,
-                bindingindex);
-            gl::EnableVertexArrayAttrib(_this.vertex_array,
-                attribindex);
-        }
+        // { // Color attribute.
+        //     auto attribindex = gl::GetAttribLocation(_this.shader_program, "a_color");
+        //     auto bindingindex = GLuint(0);
+        //     gl::VertexArrayAttribFormat(_this.vertex_array,
+        //         attribindex,
+        //         3, GL_FLOAT,
+        //         GL_FALSE, 0);
+        //     gl::VertexArrayVertexBuffer(_this.vertex_array,
+        //         bindingindex,
+        //         _this.color_buffer,
+        //         0, sizeof(glm::vec3));
+        //     gl::VertexArrayAttribBinding(_this.vertex_array,
+        //         attribindex,
+        //         bindingindex);
+        //     gl::EnableVertexArrayAttrib(_this.vertex_array,
+        //         attribindex);
+        // }
+        // { // Position attribute.
+        //     auto attribindex = gl::GetAttribLocation(_this.shader_program, "a_position");
+        //     auto bindingindex = GLuint(1);
+        //     gl::VertexArrayAttribFormat(_this.vertex_array,
+        //         attribindex,
+        //         3, GL_FLOAT,
+        //         GL_FALSE, 0);
+        //     gl::VertexArrayVertexBuffer(_this.vertex_array,
+        //         bindingindex,
+        //         _this.position_buffer,
+        //         0, sizeof(glm::vec3));
+        //     gl::VertexArrayAttribBinding(_this.vertex_array,
+        //         attribindex,
+        //         bindingindex);
+        //     gl::EnableVertexArrayAttrib(_this.vertex_array,
+        //         attribindex);
+        // }
     }
     { // Camera.
         _this.view_to_clip = glm::perspective(
@@ -109,6 +113,47 @@ void init(HelloTriangle& _this) {
             16.f / 9.f,
             0.1f,
             100.f);
+    }
+    { // Solid box.
+        _this.solid_box = gizmo::solid_box();
+        // { // Normal attribute.
+        //     auto attribindex = gl::GetAttribLocation(_this.shader_program, "a_normal");
+        //     auto bindingindex = GLuint(0);
+        //     gl::VertexArrayAttribFormat(_this.solid_box_vao,
+        //         attribindex,
+        //         3, GL_FLOAT,
+        //         GL_FALSE, 0);
+        //     gl::VertexArrayVertexBuffer(_this.solid_box_vao,
+        //         bindingindex,
+        //         _this.solid_box.normal_buffer,
+        //         0, sizeof(glm::vec3));
+        //     gl::VertexArrayAttribBinding(_this.solid_box_vao,
+        //         attribindex,
+        //         bindingindex);
+        //     gl::EnableVertexArrayAttrib(_this.solid_box_vao,
+        //         attribindex);
+        // }
+        { // Position attribute.
+            auto attribindex = gl::GetAttribLocation(_this.shader_program, "a_position");
+            auto bindingindex = GLuint(1);
+            gl::VertexArrayAttribFormat(_this.solid_box_vao,
+                attribindex,
+                3, GL_FLOAT,
+                GL_FALSE, 0);
+            gl::VertexArrayVertexBuffer(_this.solid_box_vao,
+                bindingindex,
+                _this.solid_box.position_buffer,
+                0, sizeof(glm::vec3));
+            gl::VertexArrayAttribBinding(_this.solid_box_vao,
+                attribindex,
+                bindingindex);
+            gl::EnableVertexArrayAttrib(_this.solid_box_vao,
+                attribindex);
+        }
+        { // Element buffer.
+            gl::VertexArrayElementBuffer(_this.solid_box_vao,
+                _this.solid_box.element_buffer);
+        }
     }
 }
 
@@ -150,13 +195,21 @@ void update(HelloTriangle& _this) {
 }
 
 void render(HelloTriangle& _this) {
+    gl::ClearNamedFramebuffer(0, GL_DEPTH, 0, 1.f);
+
     glUseProgram(_this.shader_program);
-    glBindVertexArray(_this.vertex_array);
+    glBindVertexArray(_this.solid_box_vao);
+
+    // glCullFace(GL_FRONT);
+    // auto cull_cap = scoped(gl::Enable(GL_CULL_FACE));
+
+    glDepthFunc(GL_LESS);
+    auto depth_cap = scoped(gl::Enable(GL_DEPTH_TEST));
 
     glProgramUniformMatrix4fv(_this.shader_program,
         _this.object_to_clip_location,
         1, GL_FALSE,
         &_this.world_to_clip[0][0]);
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 }
