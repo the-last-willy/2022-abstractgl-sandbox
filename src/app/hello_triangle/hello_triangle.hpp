@@ -28,21 +28,16 @@ void init(HelloTriangle& ht) {
             agl::standard::string(
                 "D:/dev/project/abstractgl-sandbox/src/common/glsl/shader/test.vert"));
         glCompileShader(vertex_shader);
-        GLint status;
-        glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &status);
-        std::cout << "vert " << status << std::endl;
 
         auto fragment_shader = gl::Shader(gl::FRAGMENT_SHADER);
         gl::ShaderSource(fragment_shader,
             agl::standard::string(
                 "D:/dev/project/abstractgl-sandbox/src/common/glsl/shader/test.frag"));
         glCompileShader(fragment_shader);
-        glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &status);
-        std::cout << "frag " << status << std::endl;
 
-        glAttachShader(ht.shader_program, vertex_shader);
-        glAttachShader(ht.shader_program, fragment_shader);
-        glLinkProgram(ht.shader_program);
+        gl::AttachShader(ht.shader_program, vertex_shader);
+        gl::AttachShader(ht.shader_program, fragment_shader);
+        gl::LinkProgram(ht.shader_program);
     }
     { // Triangle vertex array.
         gl::NamedBufferStorage(
