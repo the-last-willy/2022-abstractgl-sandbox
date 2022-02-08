@@ -59,35 +59,35 @@ void init(HelloTriangle& ht) {
         { // Color attribute.
             auto attribindex = gl::GetAttribLocation(ht.shader_program, "a_color");
             auto bindingindex = GLuint(0);
-            glVertexArrayAttribFormat(ht.vertex_array,
+            gl::VertexArrayAttribFormat(ht.vertex_array,
                 attribindex,
                 3, GL_FLOAT,
                 GL_FALSE, 0);
-            glVertexArrayVertexBuffer(ht.vertex_array,
+            gl::VertexArrayVertexBuffer(ht.vertex_array,
                 bindingindex,
                 ht.color_buffer,
                 0, sizeof(glm::vec3));
-            glVertexArrayAttribBinding(ht.vertex_array,
+            gl::VertexArrayAttribBinding(ht.vertex_array,
                 attribindex,
                 bindingindex);
-            glEnableVertexArrayAttrib(ht.vertex_array,
+            gl::EnableVertexArrayAttrib(ht.vertex_array,
                 attribindex);
         }
         { // Position attribute.
             auto attribindex = gl::GetAttribLocation(ht.shader_program, "a_position");
             auto bindingindex = GLuint(1);
-            glVertexArrayAttribFormat(ht.vertex_array,
+            gl::VertexArrayAttribFormat(ht.vertex_array,
                 attribindex,
                 3, GL_FLOAT,
                 GL_FALSE, 0);
-            glVertexArrayVertexBuffer(ht.vertex_array,
+            gl::VertexArrayVertexBuffer(ht.vertex_array,
                 bindingindex,
                 ht.position_buffer,
                 0, sizeof(glm::vec3));
-            glVertexArrayAttribBinding(ht.vertex_array,
+            gl::VertexArrayAttribBinding(ht.vertex_array,
                 attribindex,
                 bindingindex);
-            glEnableVertexArrayAttrib(ht.vertex_array,
+            gl::EnableVertexArrayAttrib(ht.vertex_array,
                 attribindex);
         }
     }
