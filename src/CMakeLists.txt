@@ -21,7 +21,6 @@ find_package(Microsoft.GSL REQUIRED CONFIG)
 
 find_package(abstractgl REQUIRED abstractgl)
 find_package(api_opengl REQUIRED)
-find_package(tinyobjloader REQUIRED)
 
 ################################################################################
 ################################################################################
@@ -67,7 +66,6 @@ target_link_libraries(all_libraries
         # External dependencies.
         abstractgl::abstractgl
         abstractgl::api_opengl
-        tinyobjloader::tinyobjloader
 
         # Internal depedencies.
         imgui_impl_glfw
