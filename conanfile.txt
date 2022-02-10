@@ -9,7 +9,8 @@ range-v3/0.11.0
 stb/20200203
 
 [generators]
-cmake_find_package_multi
+cmake
+# cmake_find_package_multi
 
 [options]
 glew:shared=False
