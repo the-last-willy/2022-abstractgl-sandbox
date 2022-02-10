@@ -149,7 +149,7 @@ void render(HelloTriangle& _this) {
         glUseProgram(_this.shader_program);
         glBindVertexArray(_this.solid_box_vao);
 
-        glCullFace(GL_FRONT);
+        glCullFace(GL_BACK);
         auto cull_cap = scoped(gl::Enable(GL_CULL_FACE));
 
         glDepthFunc(GL_LESS);

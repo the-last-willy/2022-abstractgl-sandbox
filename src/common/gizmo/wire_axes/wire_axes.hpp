@@ -4,8 +4,8 @@
 #include "common/dependency/glm.hpp"
 
 struct WireAxes {
-    gl::Buffer colors;
-    gl::Buffer positions;
+    gl::BufferObj colors;
+    gl::BufferObj positions;
 
     GLenum mode = GL_LINES;
     GLint first = 0;

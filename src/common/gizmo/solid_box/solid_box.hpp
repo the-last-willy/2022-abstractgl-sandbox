@@ -6,9 +6,9 @@
 namespace gizmo {
 
 struct SolidBox {
-    gl::Buffer element_buffer;
-    gl::Buffer normal_buffer;
-    gl::Buffer position_buffer;
+    gl::BufferObj element_buffer;
+    gl::BufferObj normal_buffer;
+    gl::BufferObj position_buffer;
 };
 
 inline
@@ -17,23 +17,23 @@ SolidBox solid_box() {
     gl::NamedBufferStorage(sb.element_buffer,
         {
             // -X.
-             0,  1,  2, 
-             1,  3,  2,
+             0,  2,  1, 
+             1,  2,  3,
             // -Y.
-             4,  6,  5, 
-             5,  6,  7,
+             4,  5,  6, 
+             5,  7,  6,
             // -Z.
-             8,  9, 10, 
-             9, 11, 10,
+             8, 10,  9, 
+             9, 10, 11,
             // +Z.
-            12, 14, 13,
-            13, 14, 15,
+            12, 13, 14,
+            13, 15, 14,
             // +Y.
-            16, 17, 18,
-            17, 19, 18,
+            16, 18, 17,
+            17, 18, 19,
             // +X.
-            20, 22, 21,
-            21, 22, 23
+            20, 21, 22,
+            21, 23, 22
         },
         GL_NONE);
     gl::NamedBufferStorage(sb.normal_buffer,
