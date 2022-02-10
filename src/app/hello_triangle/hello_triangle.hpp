@@ -8,13 +8,11 @@
 #include <agl/standard/all.hpp>
 
 struct HelloTriangle {
-    gl::Buffer color_buffer;
-    gl::Buffer position_buffer;
+    
+    
 
     gl::Program shader_program;
     gl::OptUniformLoc object_to_clip_location;
-
-    gl::VertexArray vertex_array;
 
     gizmo::SolidBox solid_box;
     gl::VertexArray solid_box_vao;
@@ -51,58 +49,6 @@ void init(HelloTriangle& _this) {
         _this.object_to_clip_location = gl::GetUniformLocation(
             _this.shader_program,
             "object_to_clip");
-    }
-    { // Triangle vertex array.
-        gl::NamedBufferStorage(
-            _this.color_buffer,
-            {
-                glm::vec3(1.f, 0.f, 0.f),
-                glm::vec3(0.f, 1.f, 0.f),
-                glm::vec3(0.f, 0.f, 1.f)
-            },
-            GL_NONE);
-        gl::NamedBufferStorage(
-            _this.position_buffer,
-            {
-                glm::vec3(-0.5f,  0.0f, 0.f),
-                glm::vec3(+0.5f, -0.5f, 0.f),
-                glm::vec3(+0.5f, +0.5f, 0.f)
-            },
-            GL_NONE);
-        // { // Color attribute.
-        //     auto attribindex = gl::GetAttribLocation(_this.shader_program, "a_color");
-        //     auto bindingindex = GLuint(0);
-        //     gl::VertexArrayAttribFormat(_this.vertex_array,
-        //         attribindex,
-        //         3, GL_FLOAT,
-        //         GL_FALSE, 0);
-        //     gl::VertexArrayVertexBuffer(_this.vertex_array,
-        //         bindingindex,
-        //         _this.color_buffer,
-        //         0, sizeof(glm::vec3));
-        //     gl::VertexArrayAttribBinding(_this.vertex_array,
-        //         attribindex,
-        //         bindingindex);
-        //     gl::EnableVertexArrayAttrib(_this.vertex_array,
-        //         attribindex);
-        // }
-        // { // Position attribute.
-        //     auto attribindex = gl::GetAttribLocation(_this.shader_program, "a_position");
-        //     auto bindingindex = GLuint(1);
-        //     gl::VertexArrayAttribFormat(_this.vertex_array,
-        //         attribindex,
-        //         3, GL_FLOAT,
-        //         GL_FALSE, 0);
-        //     gl::VertexArrayVertexBuffer(_this.vertex_array,
-        //         bindingindex,
-        //         _this.position_buffer,
-        //         0, sizeof(glm::vec3));
-        //     gl::VertexArrayAttribBinding(_this.vertex_array,
-        //         attribindex,
-        //         bindingindex);
-        //     gl::EnableVertexArrayAttrib(_this.vertex_array,
-        //         attribindex);
-        // }
     }
     { // Camera.
         _this.view_to_clip = glm::perspective(
