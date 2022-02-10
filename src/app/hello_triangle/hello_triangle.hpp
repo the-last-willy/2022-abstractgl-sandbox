@@ -8,8 +8,11 @@
 #include <agl/standard/all.hpp>
 
 struct HelloTriangle {
-    
-    
+    WireframeRenderer wireframe_renderer = ::wireframe_renderer();
+
+    WireAxes wire_axes;
+    gl::VertexArray wire_axes_wireframe_renderer_vao;
+
 
     gl::Program shader_program;
     gl::OptUniformLoc object_to_clip_location;
@@ -27,6 +30,8 @@ struct HelloTriangle {
 
 void init(HelloTriangle& _this) {
     std::ignore = _this;
+    { // VAOs.
+        _this.wire_axes_wireframe_renderer_vao
         = vertex_array(_this.wire_axes, _this.wireframe_renderer);
     }
     { // Shader program.
@@ -140,19 +145,39 @@ void update(HelloTriangle& _this) {
 void render(HelloTriangle& _this) {
     gl::ClearNamedFramebuffer(0, GL_DEPTH, 0, 1.f);
 
-    glUseProgram(_this.shader_program);
-    glBindVertexArray(_this.solid_box_vao);
+    { // Solid renderer.
+        glUseProgram(_this.shader_program);
+        glBindVertexArray(_this.solid_box_vao);
 
-    // glCullFace(GL_FRONT);
-    // auto cull_cap = scoped(gl::Enable(GL_CULL_FACE));
+        glCullFace(GL_FRONT);
+        auto cull_cap = scoped(gl::Enable(GL_CULL_FACE));
 
-    glDepthFunc(GL_LESS);
-    auto depth_cap = scoped(gl::Enable(GL_DEPTH_TEST));
+        glDepthFunc(GL_LESS);
+        auto depth_cap = scoped(gl::Enable(GL_DEPTH_TEST));
 
-    glProgramUniformMatrix4fv(_this.shader_program,
-        _this.object_to_clip_location,
-        1, GL_FALSE,
-        &_this.world_to_clip[0][0]);
+        glProgramUniformMatrix4fv(_this.shader_program,
+            _this.object_to_clip_location,
+            1, GL_FALSE,
+            &_this.world_to_clip[0][0]);
 
-    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+    }
+    { // Wireframe renderer.
+        glUseProgram(_this.wireframe_renderer.program);
+        
+        glBindVertexArray(_this.wire_axes_wireframe_renderer_vao);
+
+        glDepthFunc(GL_LESS);
+        auto depth_cap = scoped(gl::Enable(GL_DEPTH_TEST));
+
+        glProgramUniformMatrix4fv(_this.wireframe_renderer.program,
+            _this.wireframe_renderer.object_to_clip,
+            1, GL_FALSE,
+            &_this.world_to_clip[0][0]);
+
+        glDrawArrays(
+            _this.wire_axes.mode,
+            _this.wire_axes.first,
+            _this.wire_axes.count);
+    }
 }
