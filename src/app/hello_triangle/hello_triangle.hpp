@@ -29,10 +29,7 @@ struct HelloTriangle {
 
 void init(HelloTriangle& _this) {
     std::ignore = _this;
-    {
-        glDebugMessageCallback(&opengl_debug_message_callback, NULL);
-        glEnable(GL_DEBUG_OUTPUT);
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        = vertex_array(_this.wire_axes, _this.wireframe_renderer);
     }
     { // Shader program.
         auto vertex_shader = gl::Shader(gl::VERTEX_SHADER);

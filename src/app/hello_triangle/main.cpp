@@ -71,6 +71,13 @@ void throwing_main() {
     });
 
     { // Running application.
+        // Must be done as soon as possible but should be in program instead of here.
+        { // Debug configuration.
+            glDebugMessageCallback(&opengl_debug_message_callback, NULL);
+            glEnable(GL_DEBUG_OUTPUT);
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        }
+
         auto app = HelloTriangle();
 
         auto scheduler = Scheduler();
