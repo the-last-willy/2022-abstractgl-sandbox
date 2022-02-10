@@ -1,5 +1,5 @@
 #pragma once
 
-#include <agl/api/opengl/all.hpp>
+#include <abstractgl/api/opengl/all.hpp>
 
 namespace gl = agl::opengl;
