@@ -9,6 +9,7 @@
 set(CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 
+find_package(assimp REQUIRED CONFIG)
 find_package(glew REQUIRED CONFIG)
 find_package(glfw3 REQUIRED CONFIG)
 find_package(glm REQUIRED CONFIG)
@@ -56,6 +57,7 @@ add_library(all_libraries INTERFACE)
 target_link_libraries(all_libraries
     INTERFACE
         # Conan dependencies.
+        assimp::assimp
         GLEW::glew_s
         glfw::glfw
         glm::glm
