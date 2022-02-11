@@ -35,17 +35,17 @@ void init(HelloTriangle& _this) {
         = vertex_array(_this.wire_axes, _this.wireframe_renderer);
     }
     { // Shader program.
-        auto vertex_shader = gl::Shader(gl::VERTEX_SHADER);
+        auto vertex_shader = gl::VertexShaderObj();
         gl::ShaderSource(vertex_shader,
             agl::standard::string(
                 "D:/dev/project/abstractgl-sandbox/src/common/glsl/shader/test.vert"));
-        glCompileShader(vertex_shader);
+        gl::CompileShader(vertex_shader);
 
-        auto fragment_shader = gl::Shader(gl::FRAGMENT_SHADER);
+        auto fragment_shader = gl::FragmentShaderObj();
         gl::ShaderSource(fragment_shader,
             agl::standard::string(
                 "D:/dev/project/abstractgl-sandbox/src/common/glsl/shader/test.frag"));
-        glCompileShader(fragment_shader);
+        gl::CompileShader(fragment_shader);
 
         gl::AttachShader(_this.shader_program, vertex_shader);
         gl::AttachShader(_this.shader_program, fragment_shader);
@@ -143,11 +143,11 @@ void update(HelloTriangle& _this) {
 }
 
 void render(HelloTriangle& _this) {
-    gl::ClearNamedFramebuffer(0, GL_DEPTH, 0, 1.f);
+    gl::ClearNamedFramebuffer(gl::ZERO, gl::DEPTH, 1.f);
 
     { // Solid renderer.
-        glUseProgram(_this.shader_program);
-        glBindVertexArray(_this.solid_box_vao);
+        gl::UseProgram(_this.shader_program);
+        gl::BindVertexArray(_this.solid_uv_sphere_vao);
 
         glCullFace(GL_BACK);
         auto cull_cap = scoped(gl::Enable(GL_CULL_FACE));
@@ -163,9 +163,9 @@ void render(HelloTriangle& _this) {
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
     }
     { // Wireframe renderer.
-        glUseProgram(_this.wireframe_renderer.program);
+        gl::UseProgram(_this.wireframe_renderer.program);
         
-        glBindVertexArray(_this.wire_axes_wireframe_renderer_vao);
+        gl::BindVertexArray(_this.wire_axes_wireframe_renderer_vao);
 
         glDepthFunc(GL_LESS);
         auto depth_cap = scoped(gl::Enable(GL_DEPTH_TEST));

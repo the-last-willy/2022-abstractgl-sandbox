@@ -5,7 +5,7 @@
 #include <agl/standard/all.hpp>
 
 struct WireframeRenderer {
-    gl::Program program;
+    gl::ProgramObj program;
 
     // Attribute locations.
 
@@ -22,7 +22,7 @@ WireframeRenderer wireframe_renderer() {
     auto wr = WireframeRenderer();
     { // Program.
         { // Compiling and linking.
-            auto vertex_shader = gl::Shader(gl::VERTEX_SHADER);
+            auto vertex_shader = gl::VertexShaderObj();
             gl::ShaderSource(vertex_shader,
                 agl::standard::string(
                     "D:/dev/project/abstractgl-sandbox/src/common/glsl/wireframe_renderer/shader.vert"));

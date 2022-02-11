@@ -4,8 +4,8 @@
 #include "glsl/wireframe_renderer/wireframe_renderer.hpp"
 
 inline
-gl::VertexArray vertex_array(const WireAxes& wa, const WireframeRenderer& wr) {
-    auto va = gl::VertexArray();
+gl::VertexArrayObj vertex_array(const WireAxes& wa, const WireframeRenderer& wr) {
+    auto va = gl::VertexArrayObj();
     { // Color.
         auto bindingindex = GLuint(0);
         gl::VertexArrayAttribFormat(va,
