@@ -11,14 +11,16 @@ struct HelloTriangle {
     WireframeRenderer wireframe_renderer = ::wireframe_renderer();
 
     WireAxes wire_axes;
-    gl::VertexArray wire_axes_wireframe_renderer_vao;
+    gl::VertexArrayObj wire_axes_wireframe_renderer_vao;
 
-
-    gl::Program shader_program;
+    gl::ProgramObj shader_program;
     gl::OptUniformLoc object_to_clip_location;
 
     gizmo::SolidBox solid_box;
-    gl::VertexArray solid_box_vao;
+    gl::VertexArrayObj solid_box_vao;
+
+    gizmo::Solid_UV_Sphere solid_uv_sphere = gizmo::Solid_UV_Sphere(30, 30);
+    gl::VertexArrayObj solid_uv_sphere_vao;
 
     // Camera.
     glm::mat4 view_to_clip = glm::mat4(1.f);
@@ -103,6 +105,29 @@ void init(HelloTriangle& _this) {
                 _this.solid_box.element_buffer);
         }
     }
+        { // Solid UV sphere.
+        { // Positions.
+            auto attribindex = gl::GetAttribLocation(_this.shader_program, "a_position");
+            auto bindingindex = GLuint(1);
+            gl::VertexArrayAttribFormat(_this.solid_uv_sphere_vao,
+                attribindex,
+                3, GL_FLOAT,
+                GL_FALSE, 0);
+            gl::VertexArrayVertexBuffer(_this.solid_uv_sphere_vao,
+                bindingindex,
+                _this.solid_uv_sphere.normals_positions,
+                0, sizeof(glm::vec3));
+            gl::VertexArrayAttribBinding(_this.solid_uv_sphere_vao,
+                attribindex,
+                bindingindex);
+            gl::EnableVertexArrayAttrib(_this.solid_uv_sphere_vao,
+                attribindex);
+        }
+        { // Element buffer.
+            gl::VertexArrayElementBuffer(_this.solid_uv_sphere_vao,
+                _this.solid_uv_sphere.elements);
+        }
+    }
 }
 
 void update(HelloTriangle& _this) {
@@ -160,7 +185,11 @@ void render(HelloTriangle& _this) {
             1, GL_FALSE,
             &_this.world_to_clip[0][0]);
 
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glDrawElements(
+            _this.solid_uv_sphere.mode,
+            _this.solid_uv_sphere.count,
+            _this.solid_uv_sphere.type,
+            0);
     }
     { // Wireframe renderer.
         gl::UseProgram(_this.wireframe_renderer.program);

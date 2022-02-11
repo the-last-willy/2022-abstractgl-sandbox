@@ -3,10 +3,12 @@
 #include "common/dependency/abstractgl_api_opengl.hpp"
 #include "common/dependency/glm.hpp"
 
-#include <agl/common/constant/all.hpp>
+#include <agl/constant/all.hpp>
 
 #include <cmath>
 #include <vector>
+
+namespace gizmo {
 
 struct Solid_UV_Sphere {
     gl::BufferObj elements;
@@ -14,42 +16,53 @@ struct Solid_UV_Sphere {
 
     GLenum mode = GL_TRIANGLES;
     GLint first = 0;
+    GLenum type = GL_UNSIGNED_INT;
     GLsizei count;
 
-    Solid_UV_Sphere(int nx, int ny) {
+    Solid_UV_Sphere(int n0, int n1) {
         using agl::constant::pi;
         using agl::constant::tau;
 
-        count = ;
-        
+        count = 3 * 2 * n0 * n1;
         
         { // Elements.
-            
-        }
-        { // Normals, positions.
-            auto vectors = std::vector<glm::vec3>();
-            vectors.reserve((nx + 1) * (ny + 1) + 2);
-            // Lower cap.
-            vectors.emplace_back(-1.f, 0.f, 0.f);
-            // Middle vertices.
-            for(int x = 0; x <= nx; ++x) {
-                auto a = float(x + 1) / float(nx + 2) * pi;
-                for(int y = 0; y <= ny; ++y) {
-                    auto b = float(y) / float(ny + 1) * tau;
-                    auto sa = std::sin(a);
-                    vectors.emplace_back(
-                        -std::cos(a),
-                        sa * std::cos(b),
-                        sa * std::sin(b));
+            auto elems = std::vector<GLuint>();
+            elems.reserve(std::size_t(count));
+            for(int i0 = 0; i0 < n0; ++i0) {
+                for(int j = 0; j < n1; ++j) {
+                    auto i1 = (i0 + 1) % n0;
+                    // Lower triangle.
+                    elems.push_back(i0 * (n1 + 1) + (j + 0));
+                    elems.push_back(i1 * (n1 + 1) + (j + 0));
+                    elems.push_back(i0 * (n1 + 1) + (j + 1));
+                    // Upper triangle.
+                    elems.push_back(i0 * (n1 + 1) + (j + 1));
+                    elems.push_back(i1 * (n1 + 1) + (j + 0));
+                    elems.push_back(i1 * (n1 + 1) + (j + 1));
                 }
             }
-            
-            // Upper cap.
-            vectors.emplace_back(+1.f, 0.f, 0.f);
-
+            gl::NamedBufferStorage(elements,
+                elems,
+                GL_NONE);
+        }
+        { // Normals, positions.
+            auto vecs = std::vector<glm::vec3>();
+            vecs.reserve(n0 * (n1 + 1));
+            for(int i = 0; i < n0; ++i) {
+                auto a = tau * float(i) / float(n0);
+                for(int j = 0; j <= n1; ++j) {
+                    auto b = pi * float(j) / float(n1);
+                    vecs.emplace_back(
+                        sin(b) * cos(a),
+                        sin(b) * sin(a),
+                        -cos(b));
+                }
+            }
             gl::NamedBufferStorage(normals_positions,
-                vectors,
+                vecs,
                 GL_NONE);
         }
     }
 };
+
+}
